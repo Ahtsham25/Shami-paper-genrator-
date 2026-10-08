@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paper Maker by Shami Academy — GitHub Web Admin Panel</title>
+  <style>
+    :root {
+      --navy: #0B2447;
+      --navy-light: #19376D;
+      --emerald: #0D9488;
+      --gold: #F59E0B;
+      --bg: #F8FAFC;
+      --card: #FFFFFF;
+      --text: #0F172A;
+      --muted: #475569;
+      --border: #E2E8F0;
+    }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    header {
+      background: linear-gradient(135deg, var(--navy), var(--navy-light), var(--emerald));
+      color: #fff;
+      padding: 20px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      box-shadow: 0 4px 12px rgba(11,36,71,0.18);
+    }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: 0.3px; }
+    header p { margin: 4px 0 0; color: #FDE68A; font-size: 13px; }
+    .container { max-width: 1180px; margin: 22px auto; padding: 0 16px 48px; display: grid; gap: 18px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+    }
+    .card h2 { margin-top: 0; font-size: 17px; color: var(--navy); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+    textarea { min-height: 130px; resize: vertical; line-height: 1.5; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.92; }
+    .btn-primary { background: var(--navy); color: #fff; }
+    .btn-emerald { background: var(--emerald); color: #fff; }
+    .btn-gold { background: var(--gold); color: #0F172A; }
+    .btn-danger { background: #EF4444; color: #fff; padding: 6px 12px; font-size: 12px; }
+    .status {
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #ECFEFF;
+      border: 1px solid #06B6D4;
+      color: #0E7490;
+      font-weight: 600;
+      font-size: 13px;
+      display: none;
+    }
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      background: #F8FAFC;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 11px;
+      border-radius: 50px;
+      background: #E0F2FE;
+      color: #0369A1;
+      font-weight: 700;
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Paper Maker by Shami Academy — Web Admin Panel</h1>
+      <p>Manage Class 9th &amp; 10th Books, Editable Chapters, MCQs, Short &amp; Long Questions, and Upload to GitHub</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button class="btn-emerald" onclick="pushToGitHub()">Upload All Changes to GitHub</button>
+      <button class="btn-gold" onclick="downloadJsonFile()">Download shami_paper_bank.json</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="statusBox" class="status"></div>
+
+    <!-- 1. GitHub Repository Settings & File Upload -->
+    <div class="card">
+      <h2>1. GitHub Repository Connection &amp; File Upload</h2>
+      <div class="grid-3">
+        <div>
+          <label>GitHub Username / Owner</label>
+          <input id="ghOwner" placeholder="e.g. princeshami365" oninput="saveRepoSettings()" />
+        </div>
+        <div>
+          <label>Repository Name</label>
+          <input id="ghRepo" placeholder="e.g. paper-maker" oninput="saveRepoSettings()" />
+        </div>
+        <div>
+          <label>Branch</label>
+          <input id="ghBranch" value="main" oninput="saveRepoSettings()" />
+        </div>
+        <div>
+          <label>Target JSON Path in Repo</label>
+          <input id="ghPath" value="data/shami_paper_bank.json" oninput="saveRepoSettings()" />
+        </div>
+        <div>
+          <label>GitHub Personal Access Token (PAT)</label>
+          <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxx" oninput="saveRepoSettings()" />
+        </div>
+        <div>
+          <label>Import Existing JSON File from Computer/Phone</label>
+          <input type="file" id="localFilePicker" accept=".json" onchange="importLocalJson(event)" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="fetchFromGitHub()">Load Latest Data from GitHub</button>
+        <button class="btn-emerald" onclick="pushToGitHub()">Upload &amp; Save Data to GitHub</button>
+        <button class="btn-gold" onclick="downloadJsonFile()">Export shami_paper_bank.json</button>
+      </div>
+    </div>
+
+    <!-- 2. Select Class, Subject & Edit Chapter Names -->
+    <div class="card">
+      <h2>2. Select Class (9th / 10th), Subject &amp; Edit Chapter Names</h2>
+      <div class="grid-3">
+        <div>
+          <label>1. Select Class</label>
+          <select id="classSelect" onchange="onClassChanged()">
+            <option value="9">Class 9th (Chemistry, Physics, Urdu, English, Quran, Islamiat, Computer, Biology)</option>
+            <option value="10">Class 10th (Chemistry, Physics, Urdu, English, Quran, Pak Studies, Computer, Biology)</option>
+          </select>
+        </div>
+        <div>
+          <label>2. Select Subject / Book</label>
+          <select id="subjectSelect" onchange="onSubjectChanged()"></select>
+        </div>
+        <div>
+          <label>3. Select Chapter to Edit</label>
+          <select id="chapterSelect" onchange="onChapterChanged()"></select>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top: 14px;">
+        <div>
+          <label>Chapter Number</label>
+          <input id="chNumInput" type="number" value="1" />
+        </div>
+        <div>
+          <label>Editable Chapter Name (English)</label>
+          <input id="chNameEnInput" placeholder="e.g. Ch 1: Fundamentals of Chemistry" />
+        </div>
+        <div>
+          <label>Editable Chapter Name (Urdu)</label>
+          <input id="chNameUrInput" placeholder="باب 1: کیمسٹری کے بنیادی اصول" dir="rtl" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-emerald" onclick="saveCurrentChapterName()">Update Selected Chapter Name</button>
+        <button class="btn-primary" onclick="addNewChapter()">+ Add New Chapter to This Book</button>
+        <button class="btn-danger" onclick="deleteSelectedChapter()">Delete Selected Chapter</button>
+      </div>
+    </div>
+
+    <!-- 3. Bulk Paste & Edit MCQs, Short Questions & Long Questions -->
+    <div class="card">
+      <h2>3. Add / Bulk Paste MCQs, Short Questions &amp; Long Questions</h2>
+      <div class="grid-2">
+        <div>
+          <label>Select Question Type</label>
+          <select id="qTypeSelect" onchange="renderQuestionsList()">
+            <option value="MCQ">Q.1 — MCQs (Multiple Choice Questions)</option>
+            <option value="SHORT" selected>Q.2 — Short Questions</option>
+            <option value="LONG">Q.3 — Long Questions</option>
+          </select>
+        </div>
+        <div>
+          <label>When Pasting Text Below</label>
+          <select id="bulkModeSelect">
+            <option value="append">Add to Existing Questions in Selected Chapter</option>
+            <option value="replace">Replace All Questions of This Type in Selected Chapter</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <label>
+          Paste Questions Text Below ( automatically updates chapter questions! ):<br/>
+          • For Short / Long Questions: One per line, e.g. <code>Define Industrial Chemistry. | انڈسٹریل کیمسٹری کی تعریف کریں۔</code> (or pure English / pure Urdu lines)<br/>
+          • For MCQs: <code>Question En :: Question Ur | Option A | Option B | Option C | Option D | A</code>
+        </label>
+        <textarea id="bulkTextInput" placeholder="Define Organic Chemistry. | آرگینک کیمسٹری کی تعریف کریں۔&#10;State Law of Mass Action. | لا آف ماس ایکشن بیان کریں۔"></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn-emerald" onclick="parseAndAddBulkQuestions()">Update Chapter Questions from Pasted Text</button>
+        <button class="btn-primary" onclick="pushToGitHub()">Save &amp; Upload to GitHub Now</button>
+      </div>
+
+      <h3 style="margin-top: 20px; font-size: 15px;">
+        Questions in Selected Chapter (<span id="qCountLabel">0</span>):
+      </h3>
+      <div id="questionsListContainer"></div>
+    </div>
+
+    <!-- 4. Google AdMob Remote Configuration -->
+    <div class="card">
+      <h2>4. Google AdMob Configuration (Test vs. Live Ads)</h2>
+      <p style="font-size:12px; color:var(--muted); margin-top:0;">
+        When you switch Ad Mode to <strong>LIVE Google AdMob Ads</strong> and paste your real Ad Unit IDs below, the Android app will automatically disable Test Ads and display your Live Ads.
+      </p>
+      <div class="grid-2">
+        <div>
+          <label>Ad Mode</label>
+          <select id="adModeSelect">
+            <option value="true">Google Test Ads (For Testing)</option>
+            <option value="false">LIVE Google AdMob Ads (Turn OFF Test Ads)</option>
+          </select>
+        </div>
+        <div>
+          <label>AdMob App ID</label>
+          <input id="adAppId" value="ca-app-pub-3940256099942544~3347511713" />
+        </div>
+        <div>
+          <label>Banner Ad Unit ID</label>
+          <input id="adBannerId" value="ca-app-pub-3940256099942544/6300978111" />
+        </div>
+        <div>
+          <label>Rewarded Ad Unit ID (Unlocks Locked Books &amp; Chapters)</label>
+          <input id="adRewardedId" value="ca-app-pub-3940256099942544/5224354917" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const defaultSubjects = [
+      { id: "c9_chemistry", classLevel: "9", orderIndex: 0, nameEn: "Chemistry", nameUr: "کیمسٹری", iconKey: "science", colorHex: "#0D9488", isFreeByDefault: true },
+      { id: "c9_physics", classLevel: "9", orderIndex: 1, nameEn: "Physics", nameUr: "فزکس", iconKey: "bolt", colorHex: "#2563EB", isFreeByDefault: false },
+      { id: "c9_urdu", classLevel: "9", orderIndex: 2, nameEn: "Urdu", nameUr: "اردو", iconKey: "menu_book", colorHex: "#7C3AED", isFreeByDefault: false },
+      { id: "c9_english", classLevel: "9", orderIndex: 3, nameEn: "English", nameUr: "انگلش", iconKey: "translate", colorHex: "#DB2777", isFreeByDefault: false },
+      { id: "c9_quran", classLevel: "9", orderIndex: 4, nameEn: "Tarjuma-tul-Quran", nameUr: "ترجمۃ القرآن", iconKey: "auto_stories", colorHex: "#059669", isFreeByDefault: false },
+      { id: "c9_islamiat", classLevel: "9", orderIndex: 5, nameEn: "Islamiat", nameUr: "اسلامیات", iconKey: "mosque", colorHex: "#D97706", isFreeByDefault: false },
+      { id: "c9_computer", classLevel: "9", orderIndex: 6, nameEn: "Computer", nameUr: "کمپیوٹر", iconKey: "computer", colorHex: "#4F46E5", isFreeByDefault: false },
+      { id: "c9_biology", classLevel: "9", orderIndex: 7, nameEn: "Biology", nameUr: "بائیو", iconKey: "biotech", colorHex: "#E11D48", isFreeByDefault: false },
+      { id: "c10_chemistry", classLevel: "10", orderIndex: 0, nameEn: "Chemistry", nameUr: "کیمسٹری", iconKey: "science", colorHex: "#0D9488", isFreeByDefault: true },
+      { id: "c10_physics", classLevel: "10", orderIndex: 1, nameEn: "Physics", nameUr: "فزکس", iconKey: "bolt", colorHex: "#2563EB", isFreeByDefault: false },
+      { id: "c10_urdu", classLevel: "10", orderIndex: 2, nameEn: "Urdu", nameUr: "اردو", iconKey: "menu_book", colorHex: "#7C3AED", isFreeByDefault: false },
+      { id: "c10_english", classLevel: "10", orderIndex: 3, nameEn: "English", nameUr: "انگلش", iconKey: "translate", colorHex: "#DB2777", isFreeByDefault: false },
+      { id: "c10_quran", classLevel: "10", orderIndex: 4, nameEn: "Tarjuma-tul-Quran", nameUr: "ترجمۃ القرآن", iconKey: "auto_stories", colorHex: "#059669", isFreeByDefault: false },
+      { id: "c10_pakstudies", classLevel: "10", orderIndex: 5, nameEn: "Pakistan Studies", nameUr: "مطالعہ پاکستان", iconKey: "flag", colorHex: "#16A34A", isFreeByDefault: false },
+      { id: "c10_computer", classLevel: "10", orderIndex: 6, nameEn: "Computer", nameUr: "کمپیوٹر", iconKey: "computer", colorHex: "#4F46E5", isFreeByDefault: false },
+      { id: "c10_biology", classLevel: "10", orderIndex: 7, nameEn: "Biology", nameUr: "بائیو", iconKey: "biotech", colorHex: "#E11D48", isFreeByDefault: false }
+    ];
+
+    let bankData = {
+      version: 1,
+      updatedBy: "Paper Maker by Shami Academy Admin",
+      updatedAt: Date.now(),
+      adConfig: {
+        useTestAds: true,
+        appId: "ca-app-pub-3940256099942544~3347511713",
+        bannerAdUnitId: "ca-app-pub-3940256099942544/6300978111",
+        interstitialAdUnitId: "ca-app-pub-3940256099942544/1033173712",
+        rewardedAdUnitId: "ca-app-pub-3940256099942544/5224354917"
+      },
+      subjects: defaultSubjects,
+      chapters: [],
+      questions: []
+    };
+
+    function loadRepoSettings() {
+      document.getElementById("ghOwner").value = localStorage.getItem("shami_gh_owner") || "";
+      document.getElementById("ghRepo").value = localStorage.getItem("shami_gh_repo") || "";
+      document.getElementById("ghBranch").value = localStorage.getItem("shami_gh_branch") || "main";
+      document.getElementById("ghPath").value = localStorage.getItem("shami_gh_path") || "data/shami_paper_bank.json";
+      document.getElementById("ghToken").value = localStorage.getItem("shami_gh_token") || "";
+    }
+
+    function saveRepoSettings() {
+      localStorage.setItem("shami_gh_owner", document.getElementById("ghOwner").value.trim());
+      localStorage.setItem("shami_gh_repo", document.getElementById("ghRepo").value.trim());
+      localStorage.setItem("shami_gh_branch", document.getElementById("ghBranch").value.trim());
+      localStorage.setItem("shami_gh_path", document.getElementById("ghPath").value.trim());
+      localStorage.setItem("shami_gh_token", document.getElementById("ghToken").value.trim());
+    }
+
+    function initDefaultChapters() {
+      loadRepoSettings();
+      if (bankData.chapters.length === 0) {
+        defaultSubjects.forEach(s => {
+          for (let i = 1; i <= 4; i++) {
+            bankData.chapters.push({
+              id: `${s.id}_ch${i}`,
+              subjectId: s.id,
+              classLevel: s.classLevel,
+              chapterNumber: i,
+              titleEn: `Chapter ${i}: ${s.nameEn}`,
+              titleUr: `باب ${i}: ${s.nameUr}`,
+              isFreeByDefault: i === 1
+            });
+          }
+        });
+      }
+      onClassChanged();
+    }
+
+    function showStatus(msg) {
+      const box = document.getElementById("statusBox");
+      box.style.display = "block";
+      box.textContent = msg;
+    }
+
+    function onClassChanged() {
+      const cls = document.getElementById("classSelect").value;
+      const subSelect = document.getElementById("subjectSelect");
+      subSelect.innerHTML = "";
+      bankData.subjects.filter(s => s.classLevel === cls).forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = `${s.nameEn} (${s.nameUr})`;
+        subSelect.appendChild(opt);
+      });
+      onSubjectChanged();
+    }
+
+    function onSubjectChanged() {
+      const subId = document.getElementById("subjectSelect").value;
+      const chSelect = document.getElementById("chapterSelect");
+      chSelect.innerHTML = "";
+      bankData.chapters
+        .filter(c => c.subjectId === subId)
+        .sort((a, b) => a.chapterNumber - b.chapterNumber)
+        .forEach(c => {
+          const opt = document.createElement("option");
+          opt.value = c.id;
+          opt.textContent = `${c.chapterNumber}. ${c.titleEn} — ${c.titleUr}`;
+          chSelect.appendChild(opt);
+        });
+      onChapterChanged();
+    }
+
+    function onChapterChanged() {
+      const chId = document.getElementById("chapterSelect").value;
+      const ch = bankData.chapters.find(c => c.id === chId);
+      if (ch) {
+        document.getElementById("chNumInput").value = ch.chapterNumber;
+        document.getElementById("chNameEnInput").value = ch.titleEn;
+        document.getElementById("chNameUrInput").value = ch.titleUr;
+      }
+      renderQuestionsList();
+    }
+
+    function saveCurrentChapterName() {
+      const chId = document.getElementById("chapterSelect").value;
+      const ch = bankData.chapters.find(c => c.id === chId);
+      if (!ch) return;
+      ch.chapterNumber = parseInt(document.getElementById("chNumInput").value || "1", 10);
+      ch.titleEn = document.getElementById("chNameEnInput").value.trim() || ch.titleEn;
+      ch.titleUr = document.getElementById("chNameUrInput").value.trim() || ch.titleEn;
+      onSubjectChanged();
+      document.getElementById("chapterSelect").value = ch.id;
+      showStatus("Updated chapter name: " + ch.titleEn);
+    }
+
+    function addNewChapter() {
+      const cls = document.getElementById("classSelect").value;
+      const subId = document.getElementById("subjectSelect").value;
+      const num = parseInt(document.getElementById("chNumInput").value || "1", 10);
+      const titleEn = document.getElementById("chNameEnInput").value.trim() || `Chapter ${num}`;
+      const titleUr = document.getElementById("chNameUrInput").value.trim() || titleEn;
+      const newCh = {
+        id: `${subId}_ch_${Date.now()}`,
+        subjectId: subId,
+        classLevel: cls,
+        chapterNumber: num,
+        titleEn,
+        titleUr,
+        isFreeByDefault: num === 1
+      };
+      bankData.chapters.push(newCh);
+      onSubjectChanged();
+      document.getElementById("chapterSelect").value = newCh.id;
+      onChapterChanged();
+      showStatus("Added new chapter: " + titleEn);
+    }
+
+    function deleteSelectedChapter() {
+      const chId = document.getElementById("chapterSelect").value;
+      if (!chId) return;
+      bankData.chapters = bankData.chapters.filter(c => c.id !== chId);
+      bankData.questions = bankData.questions.filter(q => q.chapterId !== chId);
+      onSubjectChanged();
+      showStatus("Deleted chapter and its questions.");
+    }
+
+    function parseAndAddBulkQuestions() {
+      const chId = document.getElementById("chapterSelect").value;
+      const ch = bankData.chapters.find(c => c.id === chId);
+      if (!ch) return;
+      const qType = document.getElementById("qTypeSelect").value;
+      const mode = document.getElementById("bulkModeSelect").value;
+      const raw = document.getElementById("bulkTextInput").value.trim();
+      if (!raw) return showStatus("Please paste questions text first.");
+
+      if (mode === "replace") {
+        bankData.questions = bankData.questions.filter(q => !(q.chapterId === ch.id && q.type === qType));
+      }
+
+      const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      lines.forEach((line, idx) => {
+        const parts = line.split("|").map(p => p.trim());
+        if (qType === "MCQ") {
+          const [qEn, qUr] = (parts[0] || "").split("::").map(s => s.trim());
+          const [aEn, aUr] = (parts[1] || "Option A").split("::").map(s => s.trim());
+          const [bEn, bUr] = (parts[2] || "Option B").split("::").map(s => s.trim());
+          const [cEn, cUr] = (parts[3] || "Option C").split("::").map(s => s.trim());
+          const [dEn, dUr] = (parts[4] || "Option D").split("::").map(s => s.trim());
+          bankData.questions.push({
+            id: `${ch.id}_mcq_${Date.now()}_${idx}`,
+            chapterId: ch.id,
+            subjectId: ch.subjectId,
+            classLevel: ch.classLevel,
+            type: "MCQ",
+            questionEn: qEn || parts[0],
+            questionUr: qUr || qEn || parts[0],
+            optionAEn: aEn,
+            optionBEn: bEn,
+            optionCEn: cEn,
+            optionDEn: dEn,
+            optionAUr: aUr || aEn,
+            optionBUr: bUr || bEn,
+            optionCUr: cUr || cEn,
+            optionDUr: dUr || dEn,
+            correctOption: (parts[5] || "A").toUpperCase().slice(0, 1),
+            marks: 1,
+            sortOrder: idx + 1
+          });
+        } else {
+          const qEn = parts[0];
+          const qUr = parts[1] || parts[0];
+          bankData.questions.push({
+            id: `${ch.id}_${qType.toLowerCase()}_${Date.now()}_${idx}`,
+            chapterId: ch.id,
+            subjectId: ch.subjectId,
+            classLevel: ch.classLevel,
+            type: qType,
+            questionEn: qEn,
+            questionUr: qUr,
+            optionAEn: "", optionBEn: "", optionCEn: "", optionDEn: "",
+            optionAUr: "", optionBUr: "", optionCUr: "", optionDUr: "",
+            correctOption: "A",
+            marks: qType === "SHORT" ? 2 : 5,
+            sortOrder: idx + 1
+          });
+        }
+      });
+
+      document.getElementById("bulkTextInput").value = "";
+      renderQuestionsList();
+      showStatus(`Updated ${lines.length} ${qType} question(s) in '${ch.titleEn}'!`);
+    }
+
+    function renderQuestionsList() {
+      const chId = document.getElementById("chapterSelect").value;
+      const qType = document.getElementById("qTypeSelect").value;
+      const list = bankData.questions.filter(q => q.chapterId === chId && q.type === qType);
+      document.getElementById("qCountLabel").textContent = list.length;
+      const container = document.getElementById("questionsListContainer");
+      container.innerHTML = "";
+      list.forEach((q, i) => {
+        const div = document.createElement("div");
+        div.className = "list-item";
+        const mcqMeta = q.type === "MCQ"
+          ? `<br/><small style="color:#475569">(A) ${q.optionAEn} | (B) ${q.optionBEn} | (C) ${q.optionCEn} | (D) ${q.optionDEn} — Ans: <b>${q.correctOption}</b></small>`
+          : "";
+        div.innerHTML = `<div><strong>${i + 1}. ${q.questionEn}</strong> <span class="badge">${q.marks} Marks</span><br/><span style="color:#0D9488">${q.questionUr}</span>${mcqMeta}</div>
+          <button class="btn-danger" onclick="deleteQuestion('${q.id}')">Delete</button>`;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteQuestion(qId) {
+      bankData.questions = bankData.questions.filter(q => q.id !== qId);
+      renderQuestionsList();
+    }
+
+    function syncAdConfigFromInputs() {
+      bankData.adConfig = {
+        useTestAds: document.getElementById("adModeSelect").value === "true",
+        appId: document.getElementById("adAppId").value.trim(),
+        bannerAdUnitId: document.getElementById("adBannerId").value.trim(),
+        interstitialAdUnitId: "ca-app-pub-3940256099942544/1033173712",
+        rewardedAdUnitId: document.getElementById("adRewardedId").value.trim()
+      };
+      bankData.updatedAt = Date.now();
+    }
+
+    function downloadJsonFile() {
+      syncAdConfigFromInputs();
+      const blob = new Blob([JSON.stringify(bankData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "shami_paper_bank.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      showStatus("Downloaded shami_paper_bank.json!");
+    }
+
+    function importLocalJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          bankData = JSON.parse(e.target.result);
+          onClassChanged();
+          showStatus("Imported local JSON file successfully!");
+        } catch (err) {
+          showStatus("Invalid JSON file: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    async function fetchFromGitHub() {
+      saveRepoSettings();
+      const owner = document.getElementById("ghOwner").value.trim();
+      const repo = document.getElementById("ghRepo").value.trim();
+      const branch = document.getElementById("ghBranch").value.trim() || "main";
+      const path = document.getElementById("ghPath").value.trim();
+      if (!owner || !repo) return showStatus("Enter GitHub Username and Repository Name first.");
+      const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        bankData = await res.json();
+        onClassChanged();
+        showStatus("Successfully loaded question bank from GitHub!");
+      } catch (e) {
+        showStatus("Could not fetch from GitHub: " + e.message);
+      }
+    }
+
+    async function pushToGitHub() {
+      saveRepoSettings();
+      syncAdConfigFromInputs();
+      const owner = document.getElementById("ghOwner").value.trim();
+      const repo = document.getElementById("ghRepo").value.trim();
+      const branch = document.getElementById("ghBranch").value.trim() || "main";
+      const path = document.getElementById("ghPath").value.trim();
+      const token = document.getElementById("ghToken").value.trim();
+      if (!owner || !repo || !token) return showStatus("Enter GitHub Username, Repository Name, and Personal Access Token (PAT) to upload.");
+
+      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+      let sha = undefined;
+      try {
+        const getRes = await fetch(`${apiUrl}?ref=${branch}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" }
+        });
+        if (getRes.ok) {
+          const existing = await getRes.json();
+          sha = existing.sha;
+        }
+        const contentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(bankData, null, 2))));
+        const putRes = await fetch(apiUrl, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: "Update Shami Academy Paper Bank via admin.html",
+            content: contentBase64,
+            branch,
+            ...(sha ? { sha } : {})
+          })
+        });
+        if (!putRes.ok) throw new Error("GitHub API returned " + putRes.status);
+        showStatus("Successfully uploaded data/shami_paper_bank.json to GitHub!");
+      } catch (e) {
+        showStatus("Upload error: " + e.message);
+      }
+    }
+
+    initDefaultChapters();
+  </script>
+</body>
+</html>

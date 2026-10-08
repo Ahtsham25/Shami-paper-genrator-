@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Paper Maker</string>
+    <string name="brand_header_title">Paper Maker by Shami Academy</string>
+    <string name="brand_subtitle">Smart Exam Paper Generator • Class 9th &amp; 10th</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_saved">Downloads &amp; Saved</string>
+    <string name="nav_more">More</string>
+    <string name="class_9th_title">Class 9th</string>
+    <string name="class_10th_title">Class 10th</string>
+    <string name="free_badge">FREE</string>
+    <string name="locked_badge">LOCKED</string>
+    <string name="generate_paper_button">Preview &amp; Generate Paper</string>
+    <string name="download_pdf_button">Download PDF</string>
+    <string name="save_paper_button">Save Paper</string>
+    <string name="privacy_policy_title">Privacy Policy</string>
+</resources>

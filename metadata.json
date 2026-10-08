@@ -1,0 +1,6 @@
+{
+  "name": "Paper Maker",
+  "description": "Paper Maker by Shami Academy - Bilingual (Urdu/English) exam paper generator for Class 9th and 10th with drag-and-drop question builder, PDF export, AdMob manager, and GitHub admin panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
