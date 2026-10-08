@@ -16,13 +16,16 @@ android {
     applicationId = "com.aistudio.papermaker.shmqpz"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 2
+    versionName = "2.0"
 
     val isAdminApp = project.findProperty("adminApp")?.toString()?.toBoolean() == true
     buildConfigField("boolean", "IS_ADMIN_APK", isAdminApp.toString())
     if (isAdminApp) {
       applicationIdSuffix = ".admin"
+      manifestPlaceholders["appLabel"] = "Shami Admin"
+    } else {
+      manifestPlaceholders["appLabel"] = "@string/app_name"
     }
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

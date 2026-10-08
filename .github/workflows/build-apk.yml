@@ -7,6 +7,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -55,35 +58,97 @@ jobs:
             sed -i "s|GITHUB_TOKEN=.*|GITHUB_TOKEN=${ADMIN_PAT}|g" .env
           fi
 
-      - name: Restore or Generate debug.keystore for APK signing
+      - name: Restore Keystores for Signed Release & Debug APKs
         run: |
-          if [ ! -f debug.keystore ]; then
-            if [ -f debug.keystore.base64 ]; then
-              base64 -d debug.keystore.base64 > debug.keystore
-            else
-              keytool -genkeypair -v \
-                -keystore debug.keystore \
-                -storepass android \
-                -alias androiddebugkey \
-                -keypass android \
-                -keyalg RSA \
-                -keysize 2048 \
-                -validity 10000 \
-                -dname "CN=Android Debug,O=Android,C=US"
-            fi
+          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+          if [ -f .github/shami-release-key.base64 ]; then
+            base64 -d .github/shami-release-key.base64 > "${GITHUB_WORKSPACE}/my-upload-key.jks"
+          else
+            keytool -genkeypair -v \
+              -keystore "${GITHUB_WORKSPACE}/my-upload-key.jks" \
+              -storetype PKCS12 \
+              -storepass shamiacademy \
+              -alias upload \
+              -keypass shamiacademy \
+              -keyalg RSA \
+              -keysize 2048 \
+              -startdate "2024/01/01 00:00:00" \
+              -validity 10000 \
+              -dname "CN=Shami Academy,OU=Education,O=Shami Academy,L=Lahore,ST=Punjab,C=PK"
           fi
 
-      - name: 1. Build Main User App APK (Paper Maker)
+      - name: 1. Build Signed Release Main User App APK (Paper Maker)
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+          STORE_PASSWORD: shamiacademy
+          KEY_PASSWORD: shamiacademy
         run: |
-          gradle :app:assembleDebug --no-daemon --stacktrace
+          rm -rf app/build/outputs/apk
+          gradle :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist-main
-          cp app/build/outputs/apk/debug/*.apk dist-main/Paper-Maker-Main-App.apk
+          cp app/build/outputs/apk/release/*.apk dist-main/Paper-Maker-Main-App.apk
 
-      - name: 2. Build Separate Small Admin Panel App APK (Shami Admin)
+          APKSIGNER_BIN=$(find "${ANDROID_HOME}/build-tools" -name apksigner | sort -V | tail -n 1)
+          if [ -n "${APKSIGNER_BIN}" ]; then
+            "${APKSIGNER_BIN}" sign \
+              --ks "${KEYSTORE_PATH}" \
+              --ks-key-alias upload \
+              --ks-pass "pass:${STORE_PASSWORD}" \
+              --key-pass "pass:${KEY_PASSWORD}" \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              dist-main/Paper-Maker-Main-App.apk
+            "${APKSIGNER_BIN}" verify --verbose dist-main/Paper-Maker-Main-App.apk
+          fi
+
+      - name: 2. Build Signed Release Separate Admin Panel App APK (Shami Admin)
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+          STORE_PASSWORD: shamiacademy
+          KEY_PASSWORD: shamiacademy
         run: |
-          gradle :app:assembleDebug -PadminApp=true --no-daemon --stacktrace
+          rm -rf app/build/outputs/apk
+          gradle :app:assembleRelease -PadminApp=true --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist-admin
-          cp app/build/outputs/apk/debug/*.apk dist-admin/Paper-Maker-Admin-App.apk
+          cp app/build/outputs/apk/release/*.apk dist-admin/Shami-Admin-Panel-App.apk
+
+          APKSIGNER_BIN=$(find "${ANDROID_HOME}/build-tools" -name apksigner | sort -V | tail -n 1)
+          if [ -n "${APKSIGNER_BIN}" ]; then
+            "${APKSIGNER_BIN}" sign \
+              --ks "${KEYSTORE_PATH}" \
+              --ks-key-alias upload \
+              --ks-pass "pass:${STORE_PASSWORD}" \
+              --key-pass "pass:${KEY_PASSWORD}" \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              dist-admin/Shami-Admin-Panel-App.apk
+            "${APKSIGNER_BIN}" verify --verbose dist-admin/Shami-Admin-Panel-App.apk
+          fi
+
+      - name: Publish Direct Unzipped .APK Files to GitHub Releases & Summary
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          TAG_NAME="latest-apk"
+          gh release delete "${TAG_NAME}" --yes --cleanup-tag || true
+          gh release create "${TAG_NAME}" \
+            dist-main/Paper-Maker-Main-App.apk \
+            dist-admin/Shami-Admin-Panel-App.apk \
+            --title "Paper Maker & Shami Admin Direct APKs (Latest)" \
+            --notes "Direct installable Release APKs (signed with v1+v2+v3). Tap any .apk below on your Android phone to download and install directly without unzipping."
+
+          echo "## 📲 Direct Android APK Download Links (No ZIP — Tap to Install Directly)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 📘 **[Download Paper-Maker-Main-App.apk (Direct .APK)](https://github.com/${REPO_FULL}/releases/download/${TAG_NAME}/Paper-Maker-Main-App.apk)**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 🔐 **[Download Shami-Admin-Panel-App.apk (Direct .APK)](https://github.com/${REPO_FULL}/releases/download/${TAG_NAME}/Shami-Admin-Panel-App.apk)**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> **Note:** If you download from the **Artifacts** section at the bottom of this page instead, GitHub packs artifacts inside a `.zip` file — you must **Extract / Unzip** that `.zip` file first before installing the `.apk`. Using the two Direct `.APK` links above downloads the `.apk` directly without any `.zip`!" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload 1. Main User App APK Artifact
         uses: actions/upload-artifact@v4
@@ -96,5 +161,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: 2-Shami-Admin-Panel-APK
-          path: dist-admin/Paper-Maker-Admin-App.apk
+          path: dist-admin/Shami-Admin-Panel-App.apk
           if-no-files-found: error
