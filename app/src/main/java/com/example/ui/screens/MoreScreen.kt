@@ -20,15 +20,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -39,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -58,11 +62,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ads.AdMobBannerBar
 import com.example.ui.PaperMakerViewModel
+
+internal fun verifySecretAdminPin(input: String): Boolean {
+    val expected = intArrayOf(51, 55, 55, 53).map { it.toChar() }.joinToString("")
+    return input.trim() == expected
+}
 
 @Composable
 fun MoreScreen(
@@ -74,6 +85,84 @@ fun MoreScreen(
     var instName by remember(header.institutionName) { mutableStateOf(header.institutionName) }
     var defaultTime by remember(header.timeAllowed) { mutableStateOf(header.timeAllowed) }
     var secretTapCount by remember { mutableIntStateOf(0) }
+    var showPinDialog by remember { mutableStateOf(false) }
+    var enteredPin by remember { mutableStateOf("") }
+    var pinError by remember { mutableStateOf(false) }
+
+    if (showPinDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showPinDialog = false
+                enteredPin = ""
+                pinError = false
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = Color(0xFF0B2447)
+                )
+            },
+            title = {
+                Text(
+                    text = "Admin Access",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = enteredPin,
+                        onValueChange = {
+                            enteredPin = it
+                            pinError = false
+                        },
+                        label = { Text("Enter Password") },
+                        singleLine = true,
+                        isError = pinError,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (pinError) {
+                        Text(
+                            text = "Incorrect password.",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (verifySecretAdminPin(enteredPin)) {
+                            showPinDialog = false
+                            enteredPin = ""
+                            pinError = false
+                            viewModel.openOwnerAdminApp()
+                        } else {
+                            pinError = true
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0B2447))
+                ) {
+                    Text("Unlock")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showPinDialog = false
+                        enteredPin = ""
+                        pinError = false
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -83,7 +172,7 @@ fun MoreScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. Shami Academy Profile Header (Owner can tap Logo 5 times to preview Admin App in emulator)
+            // 1. Shami Academy Profile Header
             item {
                 Card(
                     shape = RoundedCornerShape(18.dp),
@@ -107,7 +196,9 @@ fun MoreScreen(
                                     secretTapCount++
                                     if (secretTapCount >= 5) {
                                         secretTapCount = 0
-                                        viewModel.openOwnerAdminApp()
+                                        enteredPin = ""
+                                        pinError = false
+                                        showPinDialog = true
                                     }
                                 }
                         )

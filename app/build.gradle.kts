@@ -23,7 +23,6 @@ android {
     buildConfigField("boolean", "IS_ADMIN_APK", isAdminApp.toString())
     if (isAdminApp) {
       applicationIdSuffix = ".admin"
-      resValue("string", "app_name", "Shami Admin")
     }
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
