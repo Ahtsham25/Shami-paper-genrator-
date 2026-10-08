@@ -7,9 +7,6 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -129,27 +126,6 @@ jobs:
             "${APKSIGNER_BIN}" verify --verbose dist-admin/Shami-Admin-Panel-App.apk
           fi
 
-      - name: Publish Direct Unzipped .APK Files to GitHub Releases & Summary
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO_FULL: ${{ github.repository }}
-        run: |
-          TAG_NAME="latest-apk"
-          gh release delete "${TAG_NAME}" --yes --cleanup-tag || true
-          gh release create "${TAG_NAME}" \
-            dist-main/Paper-Maker-Main-App.apk \
-            dist-admin/Shami-Admin-Panel-App.apk \
-            --title "Paper Maker & Shami Admin Direct APKs (Latest)" \
-            --notes "Direct installable Release APKs (signed with v1+v2+v3). Tap any .apk below on your Android phone to download and install directly without unzipping."
-
-          echo "## 📲 Direct Android APK Download Links (No ZIP — Tap to Install Directly)" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 📘 **[Download Paper-Maker-Main-App.apk (Direct .APK)](https://github.com/${REPO_FULL}/releases/download/${TAG_NAME}/Paper-Maker-Main-App.apk)**" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 🔐 **[Download Shami-Admin-Panel-App.apk (Direct .APK)](https://github.com/${REPO_FULL}/releases/download/${TAG_NAME}/Shami-Admin-Panel-App.apk)**" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "> **Note:** If you download from the **Artifacts** section at the bottom of this page instead, GitHub packs artifacts inside a `.zip` file — you must **Extract / Unzip** that `.zip` file first before installing the `.apk`. Using the two Direct `.APK` links above downloads the `.apk` directly without any `.zip`!" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Upload 1. Main User App APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -163,3 +139,12 @@ jobs:
           name: 2-Shami-Admin-Panel-APK
           path: dist-admin/Shami-Admin-Panel-App.apk
           if-no-files-found: error
+
+      - name: Write Installation Instructions to Summary
+        run: |
+          echo "## ✅ Both Signed Release APKs (v1 + v2 + v3) Built Successfully!" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "1. Scroll down to the **Artifacts** section at the bottom of this page and download:" >> "$GITHUB_STEP_SUMMARY"
+          echo "   - **`1-Paper-Maker-Main-User-APK`** (Main User App: *Paper Maker*)" >> "$GITHUB_STEP_SUMMARY"
+          echo "   - **`2-Shami-Admin-Panel-APK`** (Separate Admin App: *Shami Admin*)" >> "$GITHUB_STEP_SUMMARY"
+          echo "2. **Important:** GitHub Actions downloads artifacts as a `.zip` file. Open your phone's **Files / File Manager**, tap the downloaded `.zip` file to **Extract (Unzip)** it, and then tap the `.apk` file inside to install!" >> "$GITHUB_STEP_SUMMARY"

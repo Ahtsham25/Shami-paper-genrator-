@@ -1,9 +1,5 @@
 package com.example.data
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import com.squareup.moshi.JsonClass
-
 enum class PaperLanguage(val code: String, val labelEn: String) {
     ENGLISH("ENGLISH", "English"),
     URDU("URDU", "Urdu"),
@@ -30,10 +26,8 @@ enum class QuestionType(
     }
 }
 
-@JsonClass(generateAdapter = true)
-@Entity(tableName = "subjects")
 data class SubjectEntity(
-    @PrimaryKey val id: String,
+    val id: String,
     val classLevel: String, // "9" or "10"
     val orderIndex: Int,    // 0 = first book (FREE by default)
     val nameEn: String,
@@ -43,10 +37,8 @@ data class SubjectEntity(
     val isFreeByDefault: Boolean = (orderIndex == 0)
 )
 
-@JsonClass(generateAdapter = true)
-@Entity(tableName = "chapters")
 data class ChapterEntity(
-    @PrimaryKey val id: String,
+    val id: String,
     val subjectId: String,
     val classLevel: String, // "9" or "10"
     val chapterNumber: Int, // 1 = first chapter (FREE by default)
@@ -55,10 +47,8 @@ data class ChapterEntity(
     val isFreeByDefault: Boolean = (chapterNumber == 1)
 )
 
-@JsonClass(generateAdapter = true)
-@Entity(tableName = "questions")
 data class QuestionEntity(
-    @PrimaryKey val id: String,
+    val id: String,
     val chapterId: String,
     val subjectId: String,
     val classLevel: String,
@@ -78,7 +68,6 @@ data class QuestionEntity(
     val sortOrder: Int = 0
 )
 
-@JsonClass(generateAdapter = true)
 data class PaperHeaderConfig(
     val institutionName: String = "SHAMI ACADEMY",
     val examTitle: String = "Term Examination",
@@ -95,7 +84,6 @@ data class PaperHeaderConfig(
     val includeAnswerKey: Boolean = true
 )
 
-@JsonClass(generateAdapter = true)
 data class SavedPaperPayload(
     val header: PaperHeaderConfig,
     val mcqs: List<QuestionEntity>,
@@ -103,9 +91,8 @@ data class SavedPaperPayload(
     val longQuestions: List<QuestionEntity>
 )
 
-@Entity(tableName = "saved_papers")
 data class SavedPaperEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val institutionName: String,
     val paperTitle: String,
     val classLevel: String,
@@ -123,7 +110,6 @@ data class SavedPaperEntity(
     val createdAt: Long = System.currentTimeMillis()
 )
 
-@JsonClass(generateAdapter = true)
 data class RemoteAdConfig(
     val useTestAds: Boolean = true,
     val appId: String = "ca-app-pub-3940256099942544~3347511713",
@@ -132,7 +118,6 @@ data class RemoteAdConfig(
     val rewardedAdUnitId: String = "ca-app-pub-3940256099942544/5224354917"
 )
 
-@JsonClass(generateAdapter = true)
 data class GitHubPaperBankPayload(
     val version: Int = 1,
     val updatedBy: String = "Paper Maker by Shami Academy Admin",
