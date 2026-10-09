@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updatedBy": "Paper Maker by Shami Academy Admin",
-  "updatedAt": 1791520285378,
+  "updatedAt": 1791521041792,
   "adConfig": {
     "adsEnabled": false,
     "useTestAds": false,
@@ -9,7 +9,7 @@
     "bannerAdUnitId": "ca-app-pub-3940256099942544/6300978111",
     "interstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
     "rewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
-    "updatedAt": 1791520285332
+    "updatedAt": 1791521041741
   },
   "subjects": [
     {
@@ -4110,6 +4110,26 @@
       "optionDUr": "",
       "correctOption": "A",
       "marks": 2,
+      "sortOrder": 1
+    },
+    {
+      "id": "c9_quran_ch1_long_a5f37a4e",
+      "chapterId": "c9_quran_ch1",
+      "subjectId": "c9_quran",
+      "classLevel": "9",
+      "type": "LONG",
+      "questionEn": "سوال-1: سورۃ مریم پر ایک مفصل نوٹ تحریر کریں۔",
+      "questionUr": "سوال-1: سورۃ مریم پر ایک مفصل نوٹ تحریر کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
       "sortOrder": 1
     },
     {
