@@ -7,6 +7,10 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  actions: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -83,7 +87,7 @@ jobs:
           KEY_PASSWORD: shamiacademy
         run: |
           rm -rf app/build/outputs/apk
-          gradle :app:assembleRelease --no-daemon --no-build-cache --no-configuration-cache --stacktrace
+          gradle :app:assembleRelease -Pkotlin.compiler.execution.strategy=daemon --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist-main
           cp app/build/outputs/apk/release/*.apk dist-main/Paper-Maker-Main-App.apk
 
@@ -108,7 +112,7 @@ jobs:
           KEY_PASSWORD: shamiacademy
         run: |
           rm -rf app/build/outputs/apk
-          gradle :app:assembleRelease -PadminApp=true --no-daemon --no-build-cache --no-configuration-cache --stacktrace
+          gradle :app:assembleRelease -PadminApp=true -Pkotlin.compiler.execution.strategy=daemon --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist-admin
           cp app/build/outputs/apk/release/*.apk dist-admin/Shami-Admin-Panel-App.apk
 

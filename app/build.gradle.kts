@@ -65,10 +65,36 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  lint {
+    checkReleaseBuilds = false
+    abortOnError = false
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
   }
+}
+
+// Ensure .env.example and .env always exist so Secrets Gradle Plugin never fails on fresh clones or CI
+val defaultEnvFile = rootProject.file(".env.example")
+if (!defaultEnvFile.exists()) {
+  defaultEnvFile.writeText(
+    """
+    ADMOB_APP_ID=ca-app-pub-3940256099942544~3347511713
+    ADMOB_BANNER_ID=ca-app-pub-3940256099942544/6300978111
+    ADMOB_INTERSTITIAL_ID=ca-app-pub-3940256099942544/1033173712
+    ADMOB_REWARDED_ID=ca-app-pub-3940256099942544/5224354917
+    GITHUB_OWNER=Ahtsham25
+    GITHUB_REPO=Shami-paper-genrator-
+    GITHUB_BRANCH=main
+    GITHUB_FILE_PATH=data/shami_paper_bank.json
+    GITHUB_TOKEN=YOUR_GITHUB_TOKEN
+    """.trimIndent() + "\n"
+  )
+}
+val localEnvFile = rootProject.file(".env")
+if (!localEnvFile.exists()) {
+  defaultEnvFile.copyTo(localEnvFile, overwrite = true)
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

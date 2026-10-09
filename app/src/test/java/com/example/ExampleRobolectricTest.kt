@@ -3,11 +3,15 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import com.example.ads.AdManager
 import com.example.data.PaperHeaderConfig
+import com.example.data.RemoteAdConfig
 import com.example.data.SavedPaperPayload
 import com.example.data.SeedData
 import com.example.pdf.ExamPdfGenerator
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,5 +74,47 @@ class ExampleRobolectricTest {
         assertEquals(1008, legalPreview.pageHeightPt)
         assertEquals(16, legalPreview.fontSizePt)
         assertTrue(legalPreview.pageBitmaps.isNotEmpty())
+    }
+
+    @Test
+    fun `turning Google Ads OFF persists across restart and remote sync`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        AdManager.updateAdConfig(
+            context = context,
+            adsEnabled = false,
+            useTestAds = true,
+            configTimestamp = 2_000_000_000_000L
+        )
+        assertFalse(AdManager.state.value.adsEnabled)
+
+        // Simulate navigating back / re-initializing AdManager
+        AdManager.initialize(context)
+        assertFalse(AdManager.state.value.adsEnabled)
+
+        // Simulate older/default GitHub sync payload trying to turn ads back ON
+        AdManager.applyRemoteConfigIfPresent(
+            context = context,
+            remote = RemoteAdConfig(adsEnabled = true, useTestAds = true, updatedAt = 0L)
+        )
+        assertFalse(AdManager.state.value.adsEnabled)
+    }
+
+    @Test
+    fun `generateExamPdf saves file and exposes Downloads ShamiPaperMaker path`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val subjects = SeedData.defaultSubjects()
+        val chapters = SeedData.defaultChapters(subjects)
+        val questions = SeedData.defaultQuestions(chapters, subjects)
+        val payload = SavedPaperPayload(
+            header = PaperHeaderConfig(paperSize = "A4", fontSizePt = 11, paperVersion = 1),
+            mcqs = questions.filter { it.type == "MCQ" }.take(3),
+            shortQuestions = questions.filter { it.type == "SHORT" }.take(3),
+            longQuestions = questions.filter { it.type == "LONG" }.take(1)
+        )
+
+        val pdfFile = ExamPdfGenerator.generateExamPdf(context, payload, "Chemistry_9th")
+        assertTrue(pdfFile.exists())
+        assertTrue(pdfFile.length() > 0)
+        assertEquals("Downloads / ShamiPaperMaker", ExamPdfGenerator.PUBLIC_DOWNLOAD_FOLDER_DISPLAY)
     }
 }
