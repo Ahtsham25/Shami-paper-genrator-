@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updatedBy": "Paper Maker by Shami Academy Admin",
-  "updatedAt": 1791521041792,
+  "updatedAt": 1791529477776,
   "adConfig": {
     "adsEnabled": false,
     "useTestAds": false,
@@ -9,7 +9,7 @@
     "bannerAdUnitId": "ca-app-pub-3940256099942544/6300978111",
     "interstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
     "rewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
-    "updatedAt": 1791521041741
+    "updatedAt": 1791529477719
   },
   "subjects": [
     {
@@ -188,8 +188,8 @@
       "subjectId": "c10_biology",
       "classLevel": "10",
       "chapterNumber": 2,
-      "titleEn": "Ch 11: Homeostasis",
-      "titleUr": "باب 11: ہومیو سٹیسس",
+      "titleEn": "Ch 11 : Cellular Respiration",
+      "titleUr": "باب 11 : سیلولر ریسپائریشن",
       "isFreeByDefault": false
     },
     {
@@ -789,6 +789,26 @@
       "optionCUr": "تجرباتی تصدیق",
       "optionDUr": "یہ تمام درست ہیں",
       "correctOption": "D",
+      "marks": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "c10_biology_ch1_mcq_8bc72a31",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "ایزائمنز کا کون سا گروپ سٹارچ اور دوسرے کاربوہائیڈریٹس کو توڑتا ہے؟",
+      "questionUr": "ایزائمنز کا کون سا گروپ سٹارچ اور دوسرے کاربوہائیڈریٹس کو توڑتا ہے؟",
+      "optionAEn": "پروٹیئز",
+      "optionBEn": "لائی پیز",
+      "optionCEn": "ایمائی لایز",
+      "optionDEn": "پیپسن",
+      "optionAUr": "پروٹیئز",
+      "optionBUr": "لائی پیز",
+      "optionCUr": "ایمائی لایز",
+      "optionDUr": "پیپسن",
+      "correctOption": "C",
       "marks": 1,
       "sortOrder": 1
     },
@@ -4613,6 +4633,26 @@
       "sortOrder": 2
     },
     {
+      "id": "c10_biology_ch1_mcq_1ce070d8",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "پینکریاز ڈائی جیسٹو ایزائمنز بناتا ہے اور انہیں خارج کرتا ہے:",
+      "questionUr": "پینکریاز ڈائی جیسٹو ایزائمنز بناتا ہے اور انہیں خارج کرتا ہے:",
+      "optionAEn": "کولون میں",
+      "optionBEn": "گال بلیڈر میں",
+      "optionCEn": "جگر میں",
+      "optionDEn": "ڈیوڈینم میں",
+      "optionAUr": "کولون میں",
+      "optionBUr": "گال بلیڈر میں",
+      "optionCUr": "جگر میں",
+      "optionDUr": "ڈیوڈینم میں",
+      "correctOption": "D",
+      "marks": 1,
+      "sortOrder": 2
+    },
+    {
       "id": "c10_biology_ch1_mcq_2",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -8413,6 +8453,26 @@
       "sortOrder": 3
     },
     {
+      "id": "c10_biology_ch1_mcq_574ae10f",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "معدے میں پیپسی نو جن کس کے عمل سے پیپسن میں تبدیل ہو جاتا ہے؟",
+      "questionUr": "معدے میں پیپسی نو جن کس کے عمل سے پیپسن میں تبدیل ہو جاتا ہے؟",
+      "optionAEn": "بائل نمکیات",
+      "optionBEn": "ہارمونز",
+      "optionCEn": "HCl",
+      "optionDEn": "بائی کاربونیٹ",
+      "optionAUr": "بائل نمکیات",
+      "optionBUr": "ہارمونز",
+      "optionCUr": "HCl",
+      "optionDUr": "بائی کاربونیٹ",
+      "correctOption": "C",
+      "marks": 1,
+      "sortOrder": 3
+    },
+    {
       "id": "c10_biology_ch1_short_3",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -10933,6 +10993,26 @@
       "sortOrder": 3
     },
     {
+      "id": "c10_biology_ch1_mcq_a79846ec",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "ڈائی جیسٹو سسٹم کے کون سے حصے میں کاربوہائیڈریٹس، لپڈز اور پروٹینز کو ڈائی جیسٹ کیا جاتا ہے؟",
+      "questionUr": "ڈائی جیسٹو سسٹم کے کون سے حصے میں کاربوہائیڈریٹس، لپڈز اور پروٹینز کو ڈائی جیسٹ کیا جاتا ہے؟",
+      "optionAEn": "اورل کیویٹی",
+      "optionBEn": "معدہ",
+      "optionCEn": "سمال انٹسٹائن",
+      "optionDEn": "لارج انٹسٹائن",
+      "optionAUr": "اورل کیویٹی",
+      "optionBUr": "معدہ",
+      "optionCUr": "سمال انٹسٹائن",
+      "optionDUr": "لارج انٹسٹائن",
+      "correctOption": "C",
+      "marks": 1,
+      "sortOrder": 4
+    },
+    {
       "id": "c9_chemistry_ch1_mcq_4",
       "chapterId": "c9_chemistry_ch1",
       "subjectId": "c9_chemistry",
@@ -11013,6 +11093,26 @@
       "sortOrder": 4
     },
     {
+      "id": "c10_biology_ch1_mcq_7c8a5ff9",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "ایزائم ٹرپسن کس رطوبت میں موجود ہوتا ہے؟",
+      "questionUr": "ایزائم ٹرپسن کس رطوبت میں موجود ہوتا ہے؟",
+      "optionAEn": "پینکریاٹک جوس",
+      "optionBEn": "بائل",
+      "optionCEn": "گیسٹرک جوس",
+      "optionDEn": "سیلائیوا",
+      "optionAUr": "پینکریاٹک جوس",
+      "optionBUr": "بائل",
+      "optionCUr": "گیسٹرک جوس",
+      "optionDUr": "سیلائیوا",
+      "correctOption": "A",
+      "marks": 1,
+      "sortOrder": 5
+    },
+    {
       "id": "c9_chemistry_ch1_mcq_5",
       "chapterId": "c9_chemistry_ch1",
       "subjectId": "c9_chemistry",
@@ -11091,6 +11191,46 @@
       "correctOption": "A",
       "marks": 2,
       "sortOrder": 5
+    },
+    {
+      "id": "c10_biology_ch1_mcq_e12434b3",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "گال بلیڈر سے بائل کامن بائل ڈکٹ کے ذریعے کہاں پہنچتا ہے؟",
+      "questionUr": "گال بلیڈر سے بائل کامن بائل ڈکٹ کے ذریعے کہاں پہنچتا ہے؟",
+      "optionAEn": "معدہ",
+      "optionBEn": "ڈیوڈینم",
+      "optionCEn": "کولون",
+      "optionDEn": "پینکریاز",
+      "optionAUr": "معدہ",
+      "optionBUr": "ڈیوڈینم",
+      "optionCUr": "کولون",
+      "optionDUr": "پینکریاز",
+      "correctOption": "B",
+      "marks": 1,
+      "sortOrder": 6
+    },
+    {
+      "id": "c10_biology_ch1_mcq_b89479a7",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "MCQ",
+      "questionEn": "سمال انٹسٹائن میں بہت زیادہ تہیں ہوتی ہیں اور وہاں ولائی اور مائیکرو ولائی (microvilli) کیوں ہوتے ہیں؟",
+      "questionUr": "سمال انٹسٹائن میں بہت زیادہ تہیں ہوتی ہیں اور وہاں ولائی اور مائیکرو ولائی (microvilli) کیوں ہوتے ہیں؟",
+      "optionAEn": "خوراک کے گزرنے کی رفتار کو کم کرنے کے لیے",
+      "optionBEn": "خوراک کا انجذاب تیز کرنے کے لیے",
+      "optionCEn": "کائم کے پیچھے کی طرف بہاؤ کو روکنے کے لیے",
+      "optionDEn": "ایزائمنز پیدا کرنے کے لیے",
+      "optionAUr": "خوراک کے گزرنے کی رفتار کو کم کرنے کے لیے",
+      "optionBUr": "خوراک کا انجذاب تیز کرنے کے لیے",
+      "optionCUr": "کائم کے پیچھے کی طرف بہاؤ کو روکنے کے لیے",
+      "optionDUr": "ایزائمنز پیدا کرنے کے لیے",
+      "correctOption": "B",
+      "marks": 1,
+      "sortOrder": 7
     }
   ]
 }
