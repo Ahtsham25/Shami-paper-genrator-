@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updatedBy": "Paper Maker by Shami Academy Admin",
-  "updatedAt": 1791529595424,
+  "updatedAt": 1791529641591,
   "adConfig": {
     "adsEnabled": false,
     "useTestAds": false,
@@ -9,7 +9,7 @@
     "bannerAdUnitId": "ca-app-pub-3940256099942544/6300978111",
     "interstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
     "rewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
-    "updatedAt": 1791529595396
+    "updatedAt": 1791529641514
   },
   "subjects": [
     {
@@ -752,6 +752,26 @@
     }
   ],
   "questions": [
+    {
+      "id": "c10_biology_ch1_long_de6d19b6",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-1: ریسپیریشن، گیسوں کا تبادلہ اور تنفس کے درمیان تعلق ڈایا گرام کی مدد سے واضح کریں۔",
+      "questionUr": "سوال-1: ریسپیریشن، گیسوں کا تبادلہ اور تنفس کے درمیان تعلق ڈایا گرام کی مدد سے واضح کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 1
+    },
     {
       "id": "c10_biology_ch1_mcq_29f93414",
       "chapterId": "c10_biology_ch1",
@@ -4573,6 +4593,26 @@
       "sortOrder": 1
     },
     {
+      "id": "c10_biology_ch1_long_e15743e5",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-2: لیرنکس کو وائس باکس (آلہ صوت) کیوں کہا جاتا ہے؟ یا ہماری بول چال کی آواز کیسے پیدا ہوتی ہے؟ یا لیرنکس کیا ہے؟ اس میں آواز کیسے پیدا ہوتی ہے؟ یا ووکل کارڈز کیا ہیں؟ ان کا کیا فعل ہے؟ یا ووکل کارڈز سے آواز کیسے پیدا ہوتی ہے؟ لیرنکس کی ساخت اور فعل تحریر کیجیے۔",
+      "questionUr": "سوال-2: لیرنکس کو وائس باکس (آلہ صوت) کیوں کہا جاتا ہے؟ یا ہماری بول چال کی آواز کیسے پیدا ہوتی ہے؟ یا لیرنکس کیا ہے؟ اس میں آواز کیسے پیدا ہوتی ہے؟ یا ووکل کارڈز کیا ہیں؟ ان کا کیا فعل ہے؟ یا ووکل کارڈز سے آواز کیسے پیدا ہوتی ہے؟ لیرنکس کی ساخت اور فعل تحریر کیجیے۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 2
+    },
+    {
       "id": "c10_biology_ch1_mcq_1ff3c248",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -8353,6 +8393,26 @@
       "sortOrder": 2
     },
     {
+      "id": "c10_biology_ch1_long_185abd50",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-3: ٹریکیا کی ساخت کیبل شدہ ڈایا گرام کی مدد سے واضح کریں۔",
+      "questionUr": "سوال-3: ٹریکیا کی ساخت کیبل شدہ ڈایا گرام کی مدد سے واضح کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 3
+    },
+    {
       "id": "c10_biology_ch1_mcq_056d6994",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -10893,6 +10953,26 @@
       "sortOrder": 3
     },
     {
+      "id": "c10_biology_ch1_long_a537e01a",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-4: پھیپھڑوں کی ساخت بیان کریں۔ دائیں اور بائیں پھیپھڑے میں فرق بیان کریں۔",
+      "questionUr": "سوال-4: پھیپھڑوں کی ساخت بیان کریں۔ دائیں اور بائیں پھیپھڑے میں فرق بیان کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 4
+    },
+    {
       "id": "c10_biology_ch1_mcq_b0547729",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -11011,6 +11091,26 @@
       "correctOption": "A",
       "marks": 2,
       "sortOrder": 4
+    },
+    {
+      "id": "c10_biology_ch1_long_f723204b",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-5: پھیپھڑوں میں خون کی گردش مختصر الفاظ میں بیان کریں۔",
+      "questionUr": "سوال-5: پھیپھڑوں میں خون کی گردش مختصر الفاظ میں بیان کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 5
     },
     {
       "id": "c10_biology_ch1_mcq_a233ff82",
@@ -11133,6 +11233,26 @@
       "sortOrder": 5
     },
     {
+      "id": "c10_biology_ch1_long_3b02d6fb",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-6: انہیلیشن سے کیا مراد ہے؟ اس عمل میں ہونے والی تبدیلیوں کی مختصر وضاحت لکھیں۔",
+      "questionUr": "سوال-6: انہیلیشن سے کیا مراد ہے؟ اس عمل میں ہونے والی تبدیلیوں کی مختصر وضاحت لکھیں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 6
+    },
+    {
       "id": "c10_biology_ch1_mcq_9698eb49",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -11173,6 +11293,26 @@
       "sortOrder": 6
     },
     {
+      "id": "c10_biology_ch1_long_7bffd363",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-7: ایگز ہیلیشن سے کیا مراد ہے؟ اس عمل میں ہونے والی تبدیلیوں کی مختصر وضاحت کریں۔",
+      "questionUr": "سوال-7: ایگز ہیلیشن سے کیا مراد ہے؟ اس عمل میں ہونے والی تبدیلیوں کی مختصر وضاحت کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 7
+    },
+    {
       "id": "c10_biology_ch1_mcq_f16675f4",
       "chapterId": "c10_biology_ch1",
       "subjectId": "c10_biology",
@@ -11211,6 +11351,26 @@
       "correctOption": "A",
       "marks": 2,
       "sortOrder": 7
+    },
+    {
+      "id": "c10_biology_ch1_long_d81cd378",
+      "chapterId": "c10_biology_ch1",
+      "subjectId": "c10_biology",
+      "classLevel": "10",
+      "type": "LONG",
+      "questionEn": "سوال-8: نارمل حالات اور ورزش کے دوران سانس کی رفتار کا موازنہ کیجیے۔",
+      "questionUr": "سوال-8: نارمل حالات اور ورزش کے دوران سانس کی رفتار کا موازنہ کیجیے۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 5,
+      "sortOrder": 8
     },
     {
       "id": "c10_biology_ch1_short_22d99d11",
