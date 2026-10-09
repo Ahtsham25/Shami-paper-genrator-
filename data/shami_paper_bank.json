@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updatedBy": "Paper Maker by Shami Academy Admin",
-  "updatedAt": 1791529568329,
+  "updatedAt": 1791529595424,
   "adConfig": {
     "adsEnabled": false,
     "useTestAds": false,
@@ -9,7 +9,7 @@
     "bannerAdUnitId": "ca-app-pub-3940256099942544/6300978111",
     "interstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
     "rewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
-    "updatedAt": 1791529568288
+    "updatedAt": 1791529595396
   },
   "subjects": [
     {
@@ -752,26 +752,6 @@
     }
   ],
   "questions": [
-    {
-      "id": "c10_biology_ch1_long_1",
-      "chapterId": "c10_biology_ch1",
-      "subjectId": "c10_biology",
-      "classLevel": "10",
-      "type": "LONG",
-      "questionEn": "Explain the main topic of Ch 10: Gaseous Exchange in detail along with labelled examples/points.",
-      "questionUr": "باب 10: گیسوں کا تبادلہ کے مرکزی موضوع کی مثالوں اور اہم نکات کے ساتھ تفصیلی وضاحت کریں۔",
-      "optionAEn": "",
-      "optionBEn": "",
-      "optionCEn": "",
-      "optionDEn": "",
-      "optionAUr": "",
-      "optionBUr": "",
-      "optionCUr": "",
-      "optionDUr": "",
-      "correctOption": "A",
-      "marks": 5,
-      "sortOrder": 1
-    },
     {
       "id": "c10_biology_ch1_mcq_29f93414",
       "chapterId": "c10_biology_ch1",
@@ -4591,26 +4571,6 @@
       "correctOption": "A",
       "marks": 2,
       "sortOrder": 1
-    },
-    {
-      "id": "c10_biology_ch1_long_2",
-      "chapterId": "c10_biology_ch1",
-      "subjectId": "c10_biology",
-      "classLevel": "10",
-      "type": "LONG",
-      "questionEn": "Write a comprehensive note on the practical applications and summary of Ch 10: Gaseous Exchange.",
-      "questionUr": "باب 10: گیسوں کا تبادلہ کے عملی اطلاقات اور خلاصے پر جامع نوٹ لکھیں۔",
-      "optionAEn": "",
-      "optionBEn": "",
-      "optionCEn": "",
-      "optionDEn": "",
-      "optionAUr": "",
-      "optionBUr": "",
-      "optionCUr": "",
-      "optionDUr": "",
-      "correctOption": "A",
-      "marks": 5,
-      "sortOrder": 2
     },
     {
       "id": "c10_biology_ch1_mcq_1ff3c248",
