@@ -1,7 +1,7 @@
 {
   "version": 1,
   "updatedBy": "Paper Maker by Shami Academy Admin",
-  "updatedAt": 1791519849922,
+  "updatedAt": 1791519926861,
   "adConfig": {
     "adsEnabled": false,
     "useTestAds": false,
@@ -9,7 +9,7 @@
     "bannerAdUnitId": "ca-app-pub-3940256099942544/6300978111",
     "interstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
     "rewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917",
-    "updatedAt": 1791519849848
+    "updatedAt": 1791519926818
   },
   "subjects": [
     {
@@ -4153,13 +4153,13 @@
       "sortOrder": 1
     },
     {
-      "id": "c9_quran_ch1_short_1",
+      "id": "c9_quran_ch1_short_fa3f764a",
       "chapterId": "c9_quran_ch1",
       "subjectId": "c9_quran",
       "classLevel": "9",
       "type": "SHORT",
-      "questionEn": "Define the core concept of Surah Maryam (Introduction & Themes) with two suitable examples.",
-      "questionUr": "سورۃ مریم (تعارف اور مضامین) کے بنیادی تصور کی تعریف کریں اور دو مناسب مثالیں دیں۔",
+      "questionEn": "س-1: سورۃ مریم کو یہ نام کیوں دیا گیا?",
+      "questionUr": "س-1: سورۃ مریم کو یہ نام کیوں دیا گیا?",
       "optionAEn": "",
       "optionBEn": "",
       "optionCEn": "",
@@ -7973,13 +7973,13 @@
       "sortOrder": 2
     },
     {
-      "id": "c9_quran_ch1_short_2",
+      "id": "c9_quran_ch1_short_bcd675aa",
       "chapterId": "c9_quran_ch1",
       "subjectId": "c9_quran",
       "classLevel": "9",
       "type": "SHORT",
-      "questionEn": "Write down three important characteristics discussed in Surah Maryam (Introduction & Themes).",
-      "questionUr": "سورۃ مریم (تعارف اور مضامین) میں بیان کردہ تین اہم خصوصیات تحریر کریں۔",
+      "questionEn": "س-2: سورۃ مریم کا خلاصہ لکھیں۔",
+      "questionUr": "س-2: سورۃ مریم کا خلاصہ لکھیں۔",
       "optionAEn": "",
       "optionBEn": "",
       "optionCEn": "",
@@ -10653,13 +10653,13 @@
       "sortOrder": 3
     },
     {
-      "id": "c9_quran_ch1_short_3",
+      "id": "c9_quran_ch1_short_ffbf9d6b",
       "chapterId": "c9_quran_ch1",
       "subjectId": "c9_quran",
       "classLevel": "9",
       "type": "SHORT",
-      "questionEn": "Why is Surah Maryam (Introduction & Themes) important in Class 9th Tarjuma-tul-Quran?",
-      "questionUr": "جماعت نہم کے مضمون ترجمۃ القرآن میں سورۃ مریم (تعارف اور مضامین) کی کیا اہمیت ہے؟",
+      "questionEn": "س-3: سورۃ مریم کے اہم علمی و عملی نکات میں سے دو تحریر کیجیے۔",
+      "questionUr": "س-3: سورۃ مریم کے اہم علمی و عملی نکات میں سے دو تحریر کیجیے۔",
       "optionAEn": "",
       "optionBEn": "",
       "optionCEn": "",
@@ -11013,6 +11013,26 @@
       "sortOrder": 4
     },
     {
+      "id": "c9_quran_ch1_short_09d9f866",
+      "chapterId": "c9_quran_ch1",
+      "subjectId": "c9_quran",
+      "classLevel": "9",
+      "type": "SHORT",
+      "questionEn": "س-4: ہجرت حبشہ کا سبب کیا تھا؟",
+      "questionUr": "س-4: ہجرت حبشہ کا سبب کیا تھا؟",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 2,
+      "sortOrder": 4
+    },
+    {
       "id": "c9_chemistry_ch1_mcq_5",
       "chapterId": "c9_chemistry_ch1",
       "subjectId": "c9_chemistry",
@@ -11070,6 +11090,26 @@
       "optionDUr": "Option D",
       "correctOption": "A",
       "marks": 1,
+      "sortOrder": 5
+    },
+    {
+      "id": "c9_quran_ch1_short_905aed01",
+      "chapterId": "c9_quran_ch1",
+      "subjectId": "c9_quran",
+      "classLevel": "9",
+      "type": "SHORT",
+      "questionEn": "س-5: سورۃ مریم کی تلاوت سن کر نجاشی نے کیا کہا؟",
+      "questionUr": "س-5: سورۃ مریم کی تلاوت سن کر نجاشی نے کیا کہا؟",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 2,
       "sortOrder": 5
     },
     {
