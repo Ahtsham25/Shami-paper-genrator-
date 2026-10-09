@@ -431,6 +431,81 @@
       showStatus("Deleted chapter and its questions.");
     }
 
+    function hasUrdu(str) {
+      return /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(str || "");
+    }
+
+    function hasLatin(str) {
+      return /[A-Za-z]/.test(str || "");
+    }
+
+    function splitMixedLanguageSegment(raw) {
+      const cleaned = (raw || "").trim();
+      if (!cleaned) return ["", ""];
+      if (cleaned.includes("::")) {
+        const idx = cleaned.indexOf("::");
+        return [cleaned.slice(0, idx).trim(), cleaned.slice(idx + 2).trim()];
+      }
+      if (cleaned.includes("||")) {
+        const idx = cleaned.indexOf("||");
+        return [cleaned.slice(0, idx).trim(), cleaned.slice(idx + 2).trim()];
+      }
+      const hasUr = hasUrdu(cleaned);
+      const hasEn = hasLatin(cleaned);
+      if (hasUr && !hasEn) return ["", cleaned];
+      if (hasEn && !hasUr) return [cleaned, ""];
+      if (!hasUr && !hasEn) return [cleaned, cleaned];
+
+      const slashParts = cleaned.split(/\s+\/\s+|\s+-\s+|\t+/);
+      if (slashParts.length === 2) {
+        const [p0, p1] = slashParts.map(s => s.trim());
+        if (hasLatin(p0) && !hasUrdu(p0) && hasUrdu(p1)) return [p0, p1];
+        if (hasUrdu(p0) && hasLatin(p1) && !hasUrdu(p1)) return [p1, p0];
+      }
+
+      const firstUr = cleaned.search(/[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/);
+      const firstEn = cleaned.search(/[A-Za-z]/);
+      if (firstEn >= 0 && firstUr > firstEn) {
+        const enPart = cleaned.slice(0, firstUr).trim().replace(/^[-/|:]+\s*|\s*[-/|:]+$/g, "");
+        const urPart = cleaned.slice(firstUr).trim().replace(/^[-/|:]+\s*|\s*[-/|:]+$/g, "");
+        if (enPart && urPart) return [enPart, urPart];
+      } else if (firstUr >= 0 && firstEn > firstUr) {
+        let lastUrIdx = firstUr;
+        for (let i = 0; i < cleaned.length; i++) {
+          if (hasUrdu(cleaned[i])) lastUrIdx = i;
+        }
+        if (firstEn > lastUrIdx) {
+          const urPart = cleaned.slice(0, firstEn).trim().replace(/^[-/|:]+\s*|\s*[-/|:]+$/g, "");
+          const enPart = cleaned.slice(firstEn).trim().replace(/^[-/|:]+\s*|\s*[-/|:]+$/g, "");
+          if (enPart && urPart) return [enPart, urPart];
+        }
+      }
+      return [cleaned, cleaned];
+    }
+
+    function pairShortLongItems(items) {
+      const both = [];
+      const enOnly = [];
+      const urOnly = [];
+      items.forEach(item => {
+        if (item.en && item.ur) both.push(item);
+        else if (item.en) enOnly.push(item);
+        else if (item.ur) urOnly.push(item);
+      });
+      if (enOnly.length > 0 && urOnly.length > 0) {
+        const maxLen = Math.max(enOnly.length, urOnly.length);
+        const paired = [...both];
+        for (let i = 0; i < maxLen; i++) {
+          paired.push({
+            en: enOnly[i] ? enOnly[i].en : "",
+            ur: urOnly[i] ? urOnly[i].ur : ""
+          });
+        }
+        return paired;
+      }
+      return items;
+    }
+
     function parseAndAddBulkQuestions() {
       const chId = document.getElementById("chapterSelect").value;
       const ch = bankData.chapters.find(c => c.id === chId);
@@ -445,57 +520,117 @@
       }
 
       const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      lines.forEach((line, idx) => {
-        const parts = line.split("|").map(p => p.trim());
-        if (qType === "MCQ") {
-          const [qEn, qUr] = (parts[0] || "").split("::").map(s => s.trim());
-          const [aEn, aUr] = (parts[1] || "Option A").split("::").map(s => s.trim());
-          const [bEn, bUr] = (parts[2] || "Option B").split("::").map(s => s.trim());
-          const [cEn, cUr] = (parts[3] || "Option C").split("::").map(s => s.trim());
-          const [dEn, dUr] = (parts[4] || "Option D").split("::").map(s => s.trim());
+      let addedCount = 0;
+
+      if (qType === "MCQ") {
+        const parsedMcqs = lines.map(line => {
+          const cleanLine = line.replace(/^(?:Q(?:uestion)?\.?\s*\d+|\(\d+\)|\d+[\.\)\-\:]|[•\-\*])\s*/i, "").trim();
+          const parts = cleanLine.split("|").map(p => p.trim());
+          const [qEn, qUr] = splitMixedLanguageSegment(parts[0] || "");
+          const [aEn, aUr] = splitMixedLanguageSegment(parts[1] || "Option A");
+          const [bEn, bUr] = splitMixedLanguageSegment(parts[2] || "Option B");
+          const [cEn, cUr] = splitMixedLanguageSegment(parts[3] || "Option C");
+          const [dEn, dUr] = splitMixedLanguageSegment(parts[4] || "Option D");
+          const ans = (parts[5] || "A").toUpperCase().trim().slice(0, 1);
+          return {
+            qEn, qUr, aEn, aUr, bEn, bUr, cEn, cUr, dEn, dUr,
+            ans: ["A", "B", "C", "D"].includes(ans) ? ans : "A"
+          };
+        });
+
+        const enMcqs = parsedMcqs.filter(m => m.qEn && !m.qUr);
+        const urMcqs = parsedMcqs.filter(m => m.qUr && !m.qEn);
+        const bothMcqs = parsedMcqs.filter(m => m.qEn && m.qUr);
+
+        let finalMcqs = [];
+        if (enMcqs.length > 0 && urMcqs.length > 0) {
+          finalMcqs.push(...bothMcqs);
+          const maxLen = Math.max(enMcqs.length, urMcqs.length);
+          for (let i = 0; i < maxLen; i++) {
+            const e = enMcqs[i];
+            const u = urMcqs[i];
+            finalMcqs.push({
+              qEn: e ? e.qEn : "",
+              qUr: u ? u.qUr : "",
+              aEn: e ? (e.aEn || e.aUr) : "",
+              bEn: e ? (e.bEn || e.bUr) : "",
+              cEn: e ? (e.cEn || e.cUr) : "",
+              dEn: e ? (e.dEn || e.dUr) : "",
+              aUr: u ? (u.aUr || u.aEn) : "",
+              bUr: u ? (u.bUr || u.bEn) : "",
+              cUr: u ? (u.cUr || u.cEn) : "",
+              dUr: u ? (u.dUr || u.dEn) : "",
+              ans: (e && e.ans) || (u && u.ans) || "A"
+            });
+          }
+        } else {
+          finalMcqs = parsedMcqs;
+        }
+
+        finalMcqs.forEach((m, idx) => {
           bankData.questions.push({
             id: `${ch.id}_mcq_${Date.now()}_${idx}`,
             chapterId: ch.id,
             subjectId: ch.subjectId,
             classLevel: ch.classLevel,
             type: "MCQ",
-            questionEn: qEn || parts[0],
-            questionUr: qUr || qEn || parts[0],
-            optionAEn: aEn,
-            optionBEn: bEn,
-            optionCEn: cEn,
-            optionDEn: dEn,
-            optionAUr: aUr || aEn,
-            optionBUr: bUr || bEn,
-            optionCUr: cUr || cEn,
-            optionDUr: dUr || dEn,
-            correctOption: (parts[5] || "A").toUpperCase().slice(0, 1),
+            questionEn: m.qEn,
+            questionUr: m.qUr,
+            optionAEn: m.aEn || (m.qEn ? m.aUr : ""),
+            optionBEn: m.bEn || (m.qEn ? m.bUr : ""),
+            optionCEn: m.cEn || (m.qEn ? m.cUr : ""),
+            optionDEn: m.dEn || (m.qEn ? m.dUr : ""),
+            optionAUr: m.aUr || (m.qUr ? m.aEn : ""),
+            optionBUr: m.bUr || (m.qUr ? m.bEn : ""),
+            optionCUr: m.cUr || (m.qUr ? m.cEn : ""),
+            optionDUr: m.dUr || (m.qUr ? m.dEn : ""),
+            correctOption: m.ans,
             marks: 1,
             sortOrder: idx + 1
           });
-        } else {
-          const qEn = parts[0];
-          const qUr = parts[1] || parts[0];
+        });
+        addedCount = finalMcqs.length;
+      } else {
+        const rawItems = lines.map(line => {
+          const cleanLine = line
+            .replace(/^(?:Q(?:uestion)?\.?\s*\d+|\(\d+\)|\d+[\.\)\-\:]|[•\-\*])\s*/i, "")
+            .replace(/^(?:سوال(?:\s*نمبر)?\s*[\d۰-۹]+|[\d۰-۹]+[\.\)\-\:٫])\s*/, "")
+            .trim();
+          if (cleanLine.includes("|") && !cleanLine.includes("||")) {
+            const parts = cleanLine.split("|").map(p => p.trim()).filter(Boolean);
+            if (parts.length >= 2) {
+              const [p0, p1] = parts;
+              if (hasUrdu(p0) && !hasLatin(p0) && hasLatin(p1)) return { en: p1, ur: p0 };
+              return { en: p0, ur: p1 };
+            }
+          }
+          const [en, ur] = splitMixedLanguageSegment(cleanLine);
+          return { en, ur };
+        });
+
+        const pairedItems = pairShortLongItems(rawItems);
+        pairedItems.forEach((item, idx) => {
           bankData.questions.push({
             id: `${ch.id}_${qType.toLowerCase()}_${Date.now()}_${idx}`,
             chapterId: ch.id,
             subjectId: ch.subjectId,
             classLevel: ch.classLevel,
             type: qType,
-            questionEn: qEn,
-            questionUr: qUr,
+            questionEn: item.en,
+            questionUr: item.ur,
             optionAEn: "", optionBEn: "", optionCEn: "", optionDEn: "",
             optionAUr: "", optionBUr: "", optionCUr: "", optionDUr: "",
             correctOption: "A",
             marks: qType === "SHORT" ? 2 : 5,
             sortOrder: idx + 1
           });
-        }
-      });
+        });
+        addedCount = pairedItems.length;
+      }
 
       document.getElementById("bulkTextInput").value = "";
       renderQuestionsList();
-      showStatus(`Updated ${lines.length} ${qType} question(s) in '${ch.titleEn}'!`);
+      showStatus(`Updated ${addedCount} ${qType} question(s) in '${ch.titleEn}' (English & Urdu separated automatically)!`);
     }
 
     function renderQuestionsList() {
@@ -509,9 +644,11 @@
         const div = document.createElement("div");
         div.className = "list-item";
         const mcqMeta = q.type === "MCQ"
-          ? `<br/><small style="color:#475569">(A) ${q.optionAEn} | (B) ${q.optionBEn} | (C) ${q.optionCEn} | (D) ${q.optionDEn} — Ans: <b>${q.correctOption}</b></small>`
+          ? `<br/><small style="color:#475569">${q.optionAEn ? `(A) ${q.optionAEn} | (B) ${q.optionBEn} | (C) ${q.optionCEn} | (D) ${q.optionDEn}` : `(الف) ${q.optionAUr} | (ب) ${q.optionBUr} | (ج) ${q.optionCUr} | (د) ${q.optionDUr}`} — Ans: <b>${q.correctOption}</b></small>`
           : "";
-        div.innerHTML = `<div><strong>${i + 1}. ${q.questionEn}</strong> <span class="badge">${q.marks} Marks</span><br/><span style="color:#0D9488">${q.questionUr}</span>${mcqMeta}</div>
+        const enHtml = q.questionEn ? `<div><strong>${i + 1}. [EN] ${q.questionEn}</strong> <span class="badge">${q.marks} Marks</span></div>` : "";
+        const urHtml = q.questionUr ? `<div dir="rtl" style="color:#0D9488; text-align:right; font-weight:600; margin-top:3px;">${i + 1}. [UR] ${q.questionUr}</div>` : "";
+        div.innerHTML = `<div style="flex:1; margin-right:10px;">${enHtml}${urHtml}${mcqMeta}</div>
           <button class="btn-danger" onclick="deleteQuestion('${q.id}')">Delete</button>`;
         container.appendChild(div);
       });

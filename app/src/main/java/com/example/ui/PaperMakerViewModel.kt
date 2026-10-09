@@ -144,7 +144,26 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
                 dao.insertSubjects(subjects)
                 dao.insertChapters(chapters)
                 dao.insertQuestions(questions)
+            } else {
+                normalizeAllExistingQuestionsInDatabase()
             }
+        }
+    }
+
+    private suspend fun normalizeAllExistingQuestionsInDatabase() {
+        val allQs = dao.getAllQuestionsOnce()
+        if (allQs.isEmpty()) return
+        val grouped = allQs.groupBy { "${it.chapterId}::${it.type}" }
+        val normalizedAll = mutableListOf<QuestionEntity>()
+        var changed = false
+        for ((_, group) in grouped) {
+            val norm = BulkQuestionParser.normalizeAndPairChapterQuestions(group)
+            if (norm != group) changed = true
+            normalizedAll.addAll(norm)
+        }
+        if (changed) {
+            dao.clearAllQuestions()
+            dao.insertQuestions(normalizedAll)
         }
     }
 
@@ -665,10 +684,18 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
                 return@launch
             }
             if (replaceExisting) {
+                val normalized = BulkQuestionParser.normalizeAndPairChapterQuestions(parsed)
                 dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
+                dao.insertQuestions(normalized)
+                _statusMessage.value = "Updated ${normalized.size} ${type.titleEn} in ${chapter.titleEn}!"
+            } else {
+                val existingInChapterType = dao.getAllQuestionsOnce()
+                    .filter { it.chapterId == chapter.id && it.type == type.code }
+                val combined = BulkQuestionParser.normalizeAndPairChapterQuestions(existingInChapterType + parsed)
+                dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
+                dao.insertQuestions(combined)
+                _statusMessage.value = "Updated ${combined.size} ${type.titleEn} in ${chapter.titleEn}!"
             }
-            dao.insertQuestions(parsed)
-            _statusMessage.value = "Updated ${parsed.size} ${type.titleEn} in ${chapter.titleEn}!"
         }
     }
 
@@ -717,7 +744,9 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
         if (payload.questions.isNotEmpty()) {
             dao.clearAllQuestions()
-            dao.insertQuestions(payload.questions)
+            val grouped = payload.questions.groupBy { "${it.chapterId}::${it.type}" }
+            val normalizedAll = grouped.values.flatMap { BulkQuestionParser.normalizeAndPairChapterQuestions(it) }
+            dao.insertQuestions(normalizedAll)
         }
         AdManager.applyRemoteConfigIfPresent(getApplication(), payload.adConfig)
     }

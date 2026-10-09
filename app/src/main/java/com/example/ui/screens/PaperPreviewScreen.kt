@@ -73,11 +73,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -931,91 +934,122 @@ fun PaperPreviewWorkspaceContent(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         mcqs.forEachIndexed { idx, q ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .then(
-                                        if (header.paperVersion == 1) {
-                                            Modifier
-                                                .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(6.dp))
-                                                .padding(8.dp)
-                                        } else {
-                                            Modifier.padding(vertical = 5.dp)
-                                        }
-                                    )
-                            ) {
-                                if (lang == PaperLanguage.ENGLISH || lang == PaperLanguage.BILINGUAL) {
-                                    Text(
-                                        text = "${idx + 1}. ${q.questionEn}",
-                                        color = Color(0xFF0F172A),
-                                        fontSize = (13f * fontScaleMultiplier).sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                if (lang == PaperLanguage.URDU || lang == PaperLanguage.BILINGUAL) {
-                                    Text(
-                                        text = if (lang == PaperLanguage.URDU) "${idx + 1}۔ ${q.questionUr}" else q.questionUr,
-                                        color = Color(0xFF0F172A),
-                                        fontSize = (13f * fontScaleMultiplier).sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
+                            val cleanEn = q.resolvedQuestionEn()
+                            val cleanUr = q.resolvedQuestionUr()
+                            val optAEn = q.resolvedOptionAEn()
+                            val optBEn = q.resolvedOptionBEn()
+                            val optCEn = q.resolvedOptionCEn()
+                            val optDEn = q.resolvedOptionDEn()
+                            val optAUr = q.resolvedOptionAUr()
+                            val optBUr = q.resolvedOptionBUr()
+                            val optCUr = q.resolvedOptionCUr()
+                            val optDUr = q.resolvedOptionDUr()
 
-                                Spacer(modifier = Modifier.height(4.dp))
+                            val itemDir = if (lang == PaperLanguage.URDU) LayoutDirection.Rtl else LayoutDirection.Ltr
+                            CompositionLocalProvider(LocalLayoutDirection provides itemDir) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .then(
+                                            if (header.paperVersion == 1) {
+                                                Modifier
+                                                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(6.dp))
+                                                    .padding(8.dp)
+                                            } else {
+                                                Modifier.padding(vertical = 5.dp)
+                                            }
+                                        )
+                                ) {
+                                    when (lang) {
+                                        PaperLanguage.ENGLISH -> {
+                                            Text(
+                                                text = "${idx + 1}. ${cleanEn.ifBlank { q.questionEn }}",
+                                                color = Color(0xFF0F172A),
+                                                fontSize = (13f * fontScaleMultiplier).sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                        PaperLanguage.URDU -> {
+                                            Text(
+                                                text = "${idx + 1}۔ ${cleanUr.ifBlank { q.questionUr }}",
+                                                color = Color(0xFF0F172A),
+                                                fontSize = (13f * fontScaleMultiplier).sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                        PaperLanguage.BILINGUAL -> {
+                                            if (cleanEn.isNotBlank()) {
+                                                Text(
+                                                    text = "${idx + 1}. $cleanEn",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                            if (cleanUr.isNotBlank()) {
+                                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                                    Text(
+                                                        text = "${idx + 1}۔ $cleanUr",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (13f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
 
-                                if (header.paperVersion == 1) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(4.dp))
-                                            .background(Color(0xFFF8FAFC))
-                                            .padding(6.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        val optA = when (lang) {
-                                            PaperLanguage.ENGLISH -> "(A) ${q.optionAEn}"
-                                            PaperLanguage.URDU -> "(الف) ${q.optionAUr}"
-                                            PaperLanguage.BILINGUAL -> "(A) ${q.optionAEn}/${q.optionAUr}"
-                                        }
-                                        val optB = when (lang) {
-                                            PaperLanguage.ENGLISH -> "(B) ${q.optionBEn}"
-                                            PaperLanguage.URDU -> "(ب) ${q.optionBUr}"
-                                            PaperLanguage.BILINGUAL -> "(B) ${q.optionBEn}/${q.optionBUr}"
-                                        }
-                                        val optC = when (lang) {
-                                            PaperLanguage.ENGLISH -> "(C) ${q.optionCEn}"
-                                            PaperLanguage.URDU -> "(ج) ${q.optionCUr}"
-                                            PaperLanguage.BILINGUAL -> "(C) ${q.optionCEn}/${q.optionCUr}"
-                                        }
-                                        val optD = when (lang) {
-                                            PaperLanguage.ENGLISH -> "(D) ${q.optionDEn}"
-                                            PaperLanguage.URDU -> "(د) ${q.optionDUr}"
-                                            PaperLanguage.BILINGUAL -> "(D) ${q.optionDEn}/${q.optionDUr}"
-                                        }
-                                        Text(optA, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
-                                        Text(optB, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
-                                        Text(optC, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
-                                        Text(optD, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    val optA = when (lang) {
+                                        PaperLanguage.ENGLISH -> "(A) ${optAEn.ifBlank { q.optionAEn }}"
+                                        PaperLanguage.URDU -> "(الف) ${optAUr.ifBlank { q.optionAUr }}"
+                                        PaperLanguage.BILINGUAL -> "(A) $optAEn/$optAUr"
                                     }
-                                } else {
-                                    val optText = when (lang) {
-                                        PaperLanguage.ENGLISH ->
-                                            "(A) ${q.optionAEn}    (B) ${q.optionBEn}    (C) ${q.optionCEn}    (D) ${q.optionDEn}"
-                                        PaperLanguage.URDU ->
-                                            "(الف) ${q.optionAUr}    (ب) ${q.optionBUr}    (ج) ${q.optionCUr}    (د) ${q.optionDUr}"
-                                        PaperLanguage.BILINGUAL ->
-                                            "(A) ${q.optionAEn} / ${q.optionAUr}   (B) ${q.optionBEn} / ${q.optionBUr}   (C) ${q.optionCEn} / ${q.optionCUr}   (D) ${q.optionDEn} / ${q.optionDUr}"
+                                    val optB = when (lang) {
+                                        PaperLanguage.ENGLISH -> "(B) ${optBEn.ifBlank { q.optionBEn }}"
+                                        PaperLanguage.URDU -> "(ب) ${optBUr.ifBlank { q.optionBUr }}"
+                                        PaperLanguage.BILINGUAL -> "(B) $optBEn/$optBUr"
                                     }
-                                    Text(
-                                        text = optText,
-                                        color = Color(0xFF334155),
-                                        fontSize = (12f * fontScaleMultiplier).sp,
-                                        textAlign = if (lang == PaperLanguage.URDU) TextAlign.End else TextAlign.Start,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    HorizontalDivider(color = Color(0xFFE2E8F0), modifier = Modifier.padding(top = 4.dp))
+                                    val optC = when (lang) {
+                                        PaperLanguage.ENGLISH -> "(C) ${optCEn.ifBlank { q.optionCEn }}"
+                                        PaperLanguage.URDU -> "(ج) ${optCUr.ifBlank { q.optionCUr }}"
+                                        PaperLanguage.BILINGUAL -> "(C) $optCEn/$optCUr"
+                                    }
+                                    val optD = when (lang) {
+                                        PaperLanguage.ENGLISH -> "(D) ${optDEn.ifBlank { q.optionDEn }}"
+                                        PaperLanguage.URDU -> "(د) ${optDUr.ifBlank { q.optionDUr }}"
+                                        PaperLanguage.BILINGUAL -> "(D) $optDEn/$optDUr"
+                                    }
+
+                                    if (header.paperVersion == 1) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(4.dp))
+                                                .background(Color(0xFFF8FAFC))
+                                                .padding(6.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(optA, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
+                                            Text(optB, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
+                                            Text(optC, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
+                                            Text(optD, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
+                                        }
+                                    } else {
+                                        val optText = "$optA    $optB    $optC    $optD"
+                                        Text(
+                                            text = optText,
+                                            color = Color(0xFF334155),
+                                            fontSize = (12f * fontScaleMultiplier).sp,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        HorizontalDivider(color = Color(0xFFE2E8F0), modifier = Modifier.padding(top = 4.dp))
+                                    }
                                 }
                             }
                             Spacer(modifier = Modifier.height(6.dp))
@@ -1029,34 +1063,103 @@ fun PaperPreviewWorkspaceContent(
                             questionNum = sectionNum++,
                             titleEn = "Write short answers to the following questions.",
                             titleUr = "درج ذیل مختصر سوالات کے جوابات تحریر کریں۔",
-                            marksLabel = "(Marks: $shortMarks)",
+                            marksLabel = if (lang == PaperLanguage.URDU) "(کل نمبر: $shortMarks)" else "(Marks: $shortMarks)",
                             language = lang
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
                         shorts.forEachIndexed { idx, q ->
+                            val cleanEn = q.resolvedQuestionEn()
+                            val cleanUr = q.resolvedQuestionUr()
+
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                             ) {
-                                if (lang == PaperLanguage.ENGLISH || lang == PaperLanguage.BILINGUAL) {
-                                    Text(
-                                        text = "(${idx + 1}) ${q.questionEn}   [${q.marks}]",
-                                        color = Color(0xFF0F172A),
-                                        fontSize = (13f * fontScaleMultiplier).sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                                if (lang == PaperLanguage.URDU || lang == PaperLanguage.BILINGUAL) {
-                                    Text(
-                                        text = "(${idx + 1}) ${q.questionUr}   [${q.marks}]",
-                                        color = Color(0xFF0F172A),
-                                        fontSize = (13f * fontScaleMultiplier).sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                                when (lang) {
+                                    PaperLanguage.ENGLISH -> {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text(
+                                                text = "(${idx + 1}) ${cleanEn.ifBlank { q.questionEn }}",
+                                                color = Color(0xFF0F172A),
+                                                fontSize = (13f * fontScaleMultiplier).sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "[${q.marks}]",
+                                                color = Color(0xFF0F172A),
+                                                fontSize = (12f * fontScaleMultiplier).sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    PaperLanguage.URDU -> {
+                                        // True Right-to-Left Short Question: Question on Right, Marks on Left
+                                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text(
+                                                    text = "(${idx + 1}) ${cleanUr.ifBlank { q.questionUr }}",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "[${q.marks}]",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (12f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                    PaperLanguage.BILINGUAL -> {
+                                        if (cleanEn.isNotBlank()) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text(
+                                                    text = "(${idx + 1}) $cleanEn",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "[${q.marks}]",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (12f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        if (cleanUr.isNotBlank()) {
+                                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                                Text(
+                                                    text = "(${idx + 1}) $cleanUr",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1069,34 +1172,103 @@ fun PaperPreviewWorkspaceContent(
                             questionNum = sectionNum,
                             titleEn = "Answer the following detailed / long questions.",
                             titleUr = "درج ذیل تفصیلی سوالات کے جوابات تحریر کریں۔",
-                            marksLabel = "(Marks: $longMarks)",
+                            marksLabel = if (lang == PaperLanguage.URDU) "(کل نمبر: $longMarks)" else "(Marks: $longMarks)",
                             language = lang
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
                         longs.forEachIndexed { idx, q ->
+                            val cleanEn = q.resolvedQuestionEn()
+                            val cleanUr = q.resolvedQuestionUr()
+
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 5.dp)
                             ) {
-                                if (lang == PaperLanguage.ENGLISH || lang == PaperLanguage.BILINGUAL) {
-                                    Text(
-                                        text = "Q.${idx + 1}: ${q.questionEn}   (${q.marks} Marks)",
-                                        color = Color(0xFF0F172A),
-                                        fontSize = (13f * fontScaleMultiplier).sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                if (lang == PaperLanguage.URDU || lang == PaperLanguage.BILINGUAL) {
-                                    Text(
-                                        text = "(${idx + 1}) ${q.questionUr}   (${q.marks} نمبر)",
-                                        color = Color(0xFF0F172A),
-                                        fontSize = (13f * fontScaleMultiplier).sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.End,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                                when (lang) {
+                                    PaperLanguage.ENGLISH -> {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.Top
+                                        ) {
+                                            Text(
+                                                text = "Q.${idx + 1}: ${cleanEn.ifBlank { q.questionEn }}",
+                                                color = Color(0xFF0F172A),
+                                                fontSize = (13f * fontScaleMultiplier).sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "(${q.marks} Marks)",
+                                                color = Color(0xFF0F172A),
+                                                fontSize = (12f * fontScaleMultiplier).sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    PaperLanguage.URDU -> {
+                                        // True Right-to-Left Long Question: Question on Right, Marks on Left
+                                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text(
+                                                    text = "سوال نمبر ${idx + 1}: ${cleanUr.ifBlank { q.questionUr }}",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "(${q.marks} نمبر)",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (12f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                    PaperLanguage.BILINGUAL -> {
+                                        if (cleanEn.isNotBlank()) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text(
+                                                    text = "Q.${idx + 1}: $cleanEn",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "(${q.marks} Marks)",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (12f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                        if (cleanUr.isNotBlank()) {
+                                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                                Text(
+                                                    text = "سوال نمبر ${idx + 1}: $cleanUr   (${q.marks} نمبر)",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (13f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2126,31 +2298,34 @@ private fun PaperSectionHeaderStrip(
     marksLabel: String,
     language: PaperLanguage
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0B2447), RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = when (language) {
-                PaperLanguage.ENGLISH -> "Q.$questionNum: $titleEn"
-                PaperLanguage.URDU -> "سوال نمبر $questionNum: $titleUr"
-                PaperLanguage.BILINGUAL -> "Q.$questionNum: $titleEn | سوال نمبر $questionNum: $titleUr"
-            },
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = marksLabel,
-            color = Color(0xFFFFD700),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
+    val stripDirection = if (language == PaperLanguage.URDU) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides stripDirection) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0B2447), RoundedCornerShape(6.dp))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = when (language) {
+                    PaperLanguage.ENGLISH -> "Q.$questionNum: $titleEn"
+                    PaperLanguage.URDU -> "سوال نمبر $questionNum: $titleUr"
+                    PaperLanguage.BILINGUAL -> "Q.$questionNum: $titleEn | سوال نمبر $questionNum: $titleUr"
+                },
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = marksLabel,
+                color = Color(0xFFFFD700),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
     }
 }

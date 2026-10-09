@@ -66,7 +66,60 @@ data class QuestionEntity(
     val correctOption: String = "A",
     val marks: Int = 1,
     val sortOrder: Int = 0
-)
+) {
+    fun resolvedQuestionEn(): String {
+        val (en1, _) = BulkQuestionParser.splitBilingualText(questionEn, isOption = false)
+        if (en1.isNotBlank()) return en1
+        val (en2, _) = BulkQuestionParser.splitBilingualText(questionUr, isOption = false)
+        return en2
+    }
+
+    fun resolvedQuestionUr(): String {
+        val (_, ur1) = BulkQuestionParser.splitBilingualText(questionUr, isOption = false)
+        if (ur1.isNotBlank()) return ur1
+        val (_, ur2) = BulkQuestionParser.splitBilingualText(questionEn, isOption = false)
+        return ur2
+    }
+
+    private fun resolveOptEn(optEn: String, optUr: String): String {
+        val (en1, _) = BulkQuestionParser.splitBilingualText(optEn, isOption = true)
+        if (en1.isNotBlank()) return en1
+        val (en2, _) = BulkQuestionParser.splitBilingualText(optUr, isOption = true)
+        if (en2.isNotBlank()) return en2
+        val fallback = optEn.ifBlank { optUr }.trim()
+        return if (!BulkQuestionParser.containsUrdu(fallback)) fallback else ""
+    }
+
+    private fun resolveOptUr(optEn: String, optUr: String): String {
+        val (_, ur1) = BulkQuestionParser.splitBilingualText(optUr, isOption = true)
+        if (ur1.isNotBlank()) return ur1
+        val (_, ur2) = BulkQuestionParser.splitBilingualText(optEn, isOption = true)
+        if (ur2.isNotBlank()) return ur2
+        val fallback = optUr.ifBlank { optEn }.trim()
+        return if (!BulkQuestionParser.containsUrdu(fallback)) fallback else ""
+    }
+
+    fun resolvedOptionAEn(): String = resolveOptEn(optionAEn, optionAUr)
+    fun resolvedOptionBEn(): String = resolveOptEn(optionBEn, optionBUr)
+    fun resolvedOptionCEn(): String = resolveOptEn(optionCEn, optionCUr)
+    fun resolvedOptionDEn(): String = resolveOptEn(optionDEn, optionDUr)
+
+    fun resolvedOptionAUr(): String = resolveOptUr(optionAEn, optionAUr)
+    fun resolvedOptionBUr(): String = resolveOptUr(optionBEn, optionBUr)
+    fun resolvedOptionCUr(): String = resolveOptUr(optionCEn, optionCUr)
+    fun resolvedOptionDUr(): String = resolveOptUr(optionDEn, optionDUr)
+
+    fun hasEnglish(): Boolean = resolvedQuestionEn().isNotBlank()
+    fun hasUrdu(): Boolean = resolvedQuestionUr().isNotBlank()
+
+    fun matchesLanguage(language: PaperLanguage): Boolean {
+        return when (language) {
+            PaperLanguage.ENGLISH -> hasEnglish()
+            PaperLanguage.URDU -> hasUrdu()
+            PaperLanguage.BILINGUAL -> hasEnglish() || hasUrdu()
+        }
+    }
+}
 
 data class PaperHeaderConfig(
     val institutionName: String = "SHAMI ACADEMY",

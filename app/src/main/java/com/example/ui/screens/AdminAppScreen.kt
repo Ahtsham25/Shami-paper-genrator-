@@ -57,13 +57,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
@@ -691,10 +695,17 @@ private fun AdminQuestionsBulkTab(
                         label = {
                             Text(
                                 if (selectedType == QuestionType.MCQ) {
-                                    "Paste MCQs (Question | Opt A | Opt B | Opt C | Opt D | A)"
+                                    "Paste MCQs (English, Urdu, or Both Mixed)"
                                 } else {
-                                    "Paste ${selectedType.titleEn} (One question per line)"
+                                    "Paste ${selectedType.titleEn} (English, Urdu, or Both Mixed)"
                                 }
+                            )
+                        },
+                        supportingText = {
+                            Text(
+                                text = "Paste English & Urdu together (same line, next line, or separate blocks) — they will be automatically separated for English Medium, Urdu Medium, and Bilingual!",
+                                fontSize = 11.sp,
+                                color = Color(0xFF0D9488)
                             )
                         },
                         minLines = 5,
@@ -751,6 +762,8 @@ private fun AdminQuestionsBulkTab(
         }
 
         itemsIndexed(chapterQuestions, key = { _, q -> q.id }) { idx, q ->
+            val enText = q.resolvedQuestionEn()
+            val urText = q.resolvedQuestionUr()
             Card(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -762,12 +775,30 @@ private fun AdminQuestionsBulkTab(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "${idx + 1}. ${q.questionEn}",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
-                        )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (enText.isNotBlank()) {
+                            Text(
+                                text = "${idx + 1}. $enText",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = Color(0xFF0B2447)
+                            )
+                        }
+                        if (urText.isNotBlank() && urText != enText) {
+                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                Text(
+                                    text = "${idx + 1}. $urText",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF0D9488),
+                                    textAlign = TextAlign.Right,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
                     }
                     IconButton(onClick = { viewModel.deleteSingleQuestion(q.id) }) {
                         Icon(

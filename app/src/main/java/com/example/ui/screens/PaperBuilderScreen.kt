@@ -66,10 +66,13 @@ import android.app.Activity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ads.AdManager
@@ -307,14 +310,20 @@ fun QuestionPickerAndBuilderScreen(
         }
     }
 
-    val mcqPool = remember(availableQuestions) {
-        availableQuestions.filter { it.type == QuestionType.MCQ.code }
+    val mcqPool = remember(availableQuestions, currentLanguage) {
+        val raw = availableQuestions.filter { it.type == QuestionType.MCQ.code }
+        val filtered = raw.filter { it.matchesLanguage(currentLanguage) }
+        filtered.ifEmpty { raw }
     }
-    val shortPool = remember(availableQuestions) {
-        availableQuestions.filter { it.type == QuestionType.SHORT.code }
+    val shortPool = remember(availableQuestions, currentLanguage) {
+        val raw = availableQuestions.filter { it.type == QuestionType.SHORT.code }
+        val filtered = raw.filter { it.matchesLanguage(currentLanguage) }
+        filtered.ifEmpty { raw }
     }
-    val longPool = remember(availableQuestions) {
-        availableQuestions.filter { it.type == QuestionType.LONG.code }
+    val longPool = remember(availableQuestions, currentLanguage) {
+        val raw = availableQuestions.filter { it.type == QuestionType.LONG.code }
+        val filtered = raw.filter { it.matchesLanguage(currentLanguage) }
+        filtered.ifEmpty { raw }
     }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -559,6 +568,17 @@ private fun QuestionChecklistTab(
 
         itemsIndexed(questions, key = { _, q -> q.id }) { idx, q ->
             val checked = q.id in selectedIds
+            val cleanEn = q.resolvedQuestionEn()
+            val cleanUr = q.resolvedQuestionUr()
+            val optAEn = q.resolvedOptionAEn()
+            val optBEn = q.resolvedOptionBEn()
+            val optCEn = q.resolvedOptionCEn()
+            val optDEn = q.resolvedOptionDEn()
+            val optAUr = q.resolvedOptionAUr()
+            val optBUr = q.resolvedOptionBUr()
+            val optCUr = q.resolvedOptionCUr()
+            val optDUr = q.resolvedOptionDUr()
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -572,71 +592,97 @@ private fun QuestionChecklistTab(
                     .testTag("question_item_${q.id}"),
                 shape = RoundedCornerShape(14.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = if (checked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
-                        contentDescription = if (checked) "Selected" else "Not Selected",
-                        tint = if (checked) Color(0xFF0D9488) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Q #${idx + 1}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF0D9488)
-                            )
-                            Text(
-                                text = "${q.marks} Marks",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        if (language == PaperLanguage.ENGLISH || language == PaperLanguage.BILINGUAL) {
-                            Text(
-                                text = q.questionEn,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        if (language == PaperLanguage.URDU || language == PaperLanguage.BILINGUAL) {
-                            Text(
-                                text = q.questionUr,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (language == PaperLanguage.BILINGUAL) Color(0xFF0F766E) else MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        if (q.type == QuestionType.MCQ.code) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            val optionsLine = when (language) {
-                                PaperLanguage.ENGLISH ->
-                                    "(A) ${q.optionAEn}   (B) ${q.optionBEn}   (C) ${q.optionCEn}   (D) ${q.optionDEn}"
-                                PaperLanguage.URDU ->
-                                    "(الف) ${q.optionAUr}   (ب) ${q.optionBUr}   (ج) ${q.optionCUr}   (د) ${q.optionDUr}"
-                                PaperLanguage.BILINGUAL ->
-                                    "(A) ${q.optionAEn}/${q.optionAUr}  (B) ${q.optionBEn}/${q.optionBUr}  (C) ${q.optionCEn}/${q.optionCUr}  (D) ${q.optionDEn}/${q.optionDUr}"
+                val cardDirection = if (language == PaperLanguage.URDU) LayoutDirection.Rtl else LayoutDirection.Ltr
+                CompositionLocalProvider(LocalLayoutDirection provides cardDirection) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            imageVector = if (checked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
+                            contentDescription = if (checked) "Selected" else "Not Selected",
+                            tint = if (checked) Color(0xFF0D9488) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = if (language == PaperLanguage.URDU) "سوال #${idx + 1}" else "Q #${idx + 1}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF0D9488)
+                                )
+                                Text(
+                                    text = if (language == PaperLanguage.URDU) "${q.marks} نمبر" else "${q.marks} Marks",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
-                            Text(
-                                text = optionsLine,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+
+                            when (language) {
+                                PaperLanguage.ENGLISH -> {
+                                    Text(
+                                        text = cleanEn.ifBlank { q.questionEn },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                PaperLanguage.URDU -> {
+                                    Text(
+                                        text = cleanUr.ifBlank { q.questionUr },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                                PaperLanguage.BILINGUAL -> {
+                                    if (cleanEn.isNotBlank()) {
+                                        Text(
+                                            text = cleanEn,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                    if (cleanUr.isNotBlank()) {
+                                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                            Text(
+                                                text = cleanUr,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFF0F766E),
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (q.type == QuestionType.MCQ.code) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                val optionsLine = when (language) {
+                                    PaperLanguage.ENGLISH ->
+                                        "(A) $optAEn   (B) $optBEn   (C) $optCEn   (D) $optDEn"
+                                    PaperLanguage.URDU ->
+                                        "(الف) $optAUr   (ب) $optBUr   (ج) $optCUr   (د) $optDUr"
+                                    PaperLanguage.BILINGUAL ->
+                                        "(A) $optAEn/$optAUr  (B) $optBEn/$optBUr  (C) $optCEn/$optCUr  (D) $optDEn/$optDUr"
+                                }
+                                Text(
+                                    text = optionsLine,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
@@ -874,21 +920,49 @@ private fun DraggableSelectedQuestionRow(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                if (language == PaperLanguage.ENGLISH || language == PaperLanguage.BILINGUAL) {
-                    Text(
-                        text = "${index + 1}. ${question.questionEn}",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
-                    )
-                }
-                if (language == PaperLanguage.URDU || language == PaperLanguage.BILINGUAL) {
-                    Text(
-                        text = if (language == PaperLanguage.URDU) "${index + 1}. ${question.questionUr}" else question.questionUr,
-                        fontSize = 12.sp,
-                        color = if (language == PaperLanguage.BILINGUAL) Color(0xFF0D9488) else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2
-                    )
+                val cleanEn = question.resolvedQuestionEn()
+                val cleanUr = question.resolvedQuestionUr()
+                when (language) {
+                    PaperLanguage.ENGLISH -> {
+                        Text(
+                            text = "${index + 1}. ${cleanEn.ifBlank { question.questionEn }}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2
+                        )
+                    }
+                    PaperLanguage.URDU -> {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                            Text(
+                                text = "${index + 1}۔ ${cleanUr.ifBlank { question.questionUr }}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                    PaperLanguage.BILINGUAL -> {
+                        if (cleanEn.isNotBlank()) {
+                            Text(
+                                text = "${index + 1}. $cleanEn",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 2
+                            )
+                        }
+                        if (cleanUr.isNotBlank()) {
+                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                Text(
+                                    text = "${index + 1}۔ $cleanUr",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF0D9488),
+                                    maxLines = 2,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
                 }
             }
             IconButton(

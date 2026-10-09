@@ -25,6 +25,7 @@ import android.print.PrintManager
 import android.provider.MediaStore
 import android.text.Layout
 import android.text.StaticLayout
+import android.text.TextDirectionHeuristics
 import android.text.TextPaint
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -71,7 +72,6 @@ object ExamPdfGenerator {
         val bmpHeight = (pageHeight * scaleFactor).roundToInt().coerceAtLeast(420)
 
         val bitmaps = mutableListOf<Bitmap>()
-        var currentBitmap: Bitmap? = null
 
         val metrics = drawExamDocumentPages(
             payload = payload,
@@ -82,7 +82,6 @@ object ExamPdfGenerator {
                 val c = Canvas(bmp)
                 c.drawColor(Color.WHITE)
                 c.scale(scaleFactor, scaleFactor)
-                currentBitmap = bmp
                 bitmaps.add(bmp)
                 c
             },
@@ -322,6 +321,12 @@ object ExamPdfGenerator {
             )
         }
 
+        fun drawRightAlignedSingleLine(c: Canvas, text: String, rightX: Float, y: Float, paint: TextPaint) {
+            val rtlText = "\u200F$text"
+            val w = paint.measureText(rtlText)
+            c.drawText(rtlText, (rightX - w).coerceAtLeast(MARGIN_H + 4f), y, paint)
+        }
+
         fun drawFooter(c: Canvas, pNum: Int) {
             c.drawLine(
                 MARGIN_H,
@@ -364,29 +369,65 @@ object ExamPdfGenerator {
             }
         }
 
+        /**
+         * Draws multiline text with guaranteed Left-to-Right (for English) or
+         * Right-to-Left (for Urdu) paragraph direction and alignment.
+         */
         fun drawMultilineText(
             text: String,
             paint: TextPaint,
             width: Int = contentWidth,
             xOffset: Float = MARGIN_H,
-            alignment: Layout.Alignment = Layout.Alignment.ALIGN_NORMAL
+            isRtl: Boolean = false,
+            advanceY: Boolean = true
         ): Float {
             if (text.isBlank()) return 0f
+            val safeWidth = width.coerceAtLeast(40)
+            // Prefix with Unicode Right-to-Left Mark (\u200F) when isRtl=true so leading
+            // question numbers like "(1)" or "1۔" stay on the far right of the Urdu line!
+            val directionalText = if (isRtl) "\u200F$text" else text
+            val textDir = if (isRtl) TextDirectionHeuristics.RTL else TextDirectionHeuristics.LTR
+
+            // Probe paragraph direction so that whether on real Android (DIR_RIGHT_TO_LEFT = -1)
+            // or headless JVM test stub, Urdu is 100% guaranteed to align to the RIGHT edge
+            // and English is 100% guaranteed to align to the LEFT edge!
+            val probeLayout = StaticLayout.Builder
+                .obtain(directionalText, 0, directionalText.length, paint, safeWidth)
+                .setTextDirection(textDir)
+                .build()
+            val effectiveAlignment = if (isRtl) {
+                if (probeLayout.getParagraphDirection(0) == Layout.DIR_RIGHT_TO_LEFT) {
+                    Layout.Alignment.ALIGN_NORMAL
+                } else {
+                    Layout.Alignment.ALIGN_OPPOSITE
+                }
+            } else {
+                if (probeLayout.getParagraphDirection(0) == Layout.DIR_LEFT_TO_RIGHT) {
+                    Layout.Alignment.ALIGN_NORMAL
+                } else {
+                    Layout.Alignment.ALIGN_OPPOSITE
+                }
+            }
+
             val staticLayout = StaticLayout.Builder
-                .obtain(text, 0, text.length, paint, width.coerceAtLeast(40))
-                .setAlignment(alignment)
+                .obtain(directionalText, 0, directionalText.length, paint, safeWidth)
+                .setTextDirection(textDir)
+                .setAlignment(effectiveAlignment)
                 .setLineSpacing(2f, 1.05f)
                 .setIncludePad(false)
                 .build()
+
             val height = staticLayout.height.toFloat()
             ensureSpace(height + 5f)
             canvas.save()
             canvas.translate(xOffset, yPos)
             staticLayout.draw(canvas)
             canvas.restore()
-            yPos += height + 3.5f
-            if (pageNumber == 1) {
-                firstPageMaxY = maxOf(firstPageMaxY, yPos)
+            if (advanceY) {
+                yPos += height + 3.5f
+                if (pageNumber == 1) {
+                    firstPageMaxY = maxOf(firstPageMaxY, yPos)
+                }
             }
             return height
         }
@@ -397,7 +438,7 @@ object ExamPdfGenerator {
         val instName = payload.header.institutionName.ifBlank { "SHAMI ACADEMY" }.uppercase()
         val subjectDisplay = when (lang) {
             PaperLanguage.ENGLISH -> payload.header.subjectNameEn
-            PaperLanguage.URDU -> payload.header.subjectNameUr
+            PaperLanguage.URDU -> payload.header.subjectNameUr.ifBlank { payload.header.subjectNameEn }
             PaperLanguage.BILINGUAL -> "${payload.header.subjectNameEn} (${payload.header.subjectNameUr})"
         }
         val studentVal = payload.header.studentNameValue.ifBlank { "____________________" }
@@ -413,8 +454,8 @@ object ExamPdfGenerator {
             val left = MARGIN_H
             val right = pageWidth - MARGIN_H
             val midX = (left + right) / 2f
-            val col1 = left + (contentWidth * 0.38f)
-            val col2 = left + (contentWidth * 0.70f)
+            val col1 = if (lang == PaperLanguage.URDU) left + (contentWidth * 0.30f) else left + (contentWidth * 0.38f)
+            val col2 = if (lang == PaperLanguage.URDU) left + (contentWidth * 0.62f) else left + (contentWidth * 0.70f)
 
             canvas.drawRect(left, top, right, top + row1H, fillHeaderPaint)
             canvas.drawRect(left, top + row1H + row2H, right, top + totalH, fillSubtlePaint)
@@ -430,14 +471,24 @@ object ExamPdfGenerator {
             val instW = titlePaint.measureText(instName)
             canvas.drawText(instName, ((pageWidth - instW) / 2f).coerceAtLeast(left + 8f), top + 21f, titlePaint)
 
-            // Row 2: Student Name | Roll Number
-            canvas.drawText("Name: $studentVal", left + 8f, top + row1H + 16f, headerCellPaint)
-            canvas.drawText("Roll No: $rollVal", midX + 8f, top + row1H + 16f, headerCellPaint)
+            if (lang == PaperLanguage.URDU) {
+                // Urdu RTL Table Header: Name on Right, Roll No on Left; Subject on Right, Time in Middle, Marks on Left
+                drawRightAlignedSingleLine(canvas, "نام طالب علم: $studentVal", right - 8f, top + row1H + 16f, headerCellPaint)
+                drawRightAlignedSingleLine(canvas, "رول نمبر: $rollVal", midX - 8f, top + row1H + 16f, headerCellPaint)
 
-            // Row 3: Subject & Class | Time Allowed | Total Marks
-            canvas.drawText("${payload.header.classLabel} - $subjectDisplay", left + 8f, top + row1H + row2H + 16f, headerCellPaint)
-            canvas.drawText("Time: ${payload.header.timeAllowed}", col1 + 8f, top + row1H + row2H + 16f, headerCellPaint)
-            canvas.drawText("Marks: $grandTotalMarks", col2 + 8f, top + row1H + row2H + 16f, headerCellPaint)
+                drawRightAlignedSingleLine(canvas, "مضمون: $subjectDisplay (${payload.header.classLabel})", right - 8f, top + row1H + row2H + 16f, headerCellPaint)
+                drawRightAlignedSingleLine(canvas, "وقت: ${payload.header.timeAllowed}", col2 - 8f, top + row1H + row2H + 16f, headerCellPaint)
+                drawRightAlignedSingleLine(canvas, "کل نمبر: $grandTotalMarks", col1 - 8f, top + row1H + row2H + 16f, headerCellPaint)
+            } else {
+                // Row 2: Student Name | Roll Number
+                canvas.drawText("Name: $studentVal", left + 8f, top + row1H + 16f, headerCellPaint)
+                canvas.drawText("Roll No: $rollVal", midX + 8f, top + row1H + 16f, headerCellPaint)
+
+                // Row 3: Subject & Class | Time Allowed | Total Marks
+                canvas.drawText("${payload.header.classLabel} - $subjectDisplay", left + 8f, top + row1H + row2H + 16f, headerCellPaint)
+                canvas.drawText("Time: ${payload.header.timeAllowed}", col1 + 8f, top + row1H + row2H + 16f, headerCellPaint)
+                canvas.drawText("Marks: $grandTotalMarks", col2 + 8f, top + row1H + row2H + 16f, headerCellPaint)
+            }
 
             yPos = top + totalH + 12f
         } else {
@@ -449,15 +500,26 @@ object ExamPdfGenerator {
             val instW = titlePaint.measureText(instName)
             canvas.drawText(instName, ((pageWidth - instW) / 2f).coerceAtLeast(MARGIN_H + 8f), top + 22f, titlePaint)
 
-            val subLine = "${payload.header.classLabel}  •  Subject: $subjectDisplay  •  ${payload.header.examTitle}"
+            val subLine = if (lang == PaperLanguage.URDU) {
+                "مضمون: $subjectDisplay  •  ${payload.header.classLabel}"
+            } else {
+                "${payload.header.classLabel}  •  Subject: $subjectDisplay  •  ${payload.header.examTitle}"
+            }
             val subW = subHeaderPaint.measureText(subLine)
             canvas.drawText(subLine, ((pageWidth - subW) / 2f).coerceAtLeast(MARGIN_H + 8f), top + 40f, subHeaderPaint)
 
             canvas.drawLine(MARGIN_H + 8f, top + 46f, pageWidth - MARGIN_H - 8f, top + 46f, borderPaint)
-            canvas.drawText("Student Name: $studentVal", MARGIN_H + 10f, top + 62f, headerCellPaint)
-            canvas.drawText("Roll No: $rollVal", pageWidth - MARGIN_H - 180f, top + 62f, headerCellPaint)
-            canvas.drawText("Time Allowed: ${payload.header.timeAllowed}", MARGIN_H + 10f, top + 78f, headerCellPaint)
-            canvas.drawText("Total Marks: $grandTotalMarks", pageWidth - MARGIN_H - 180f, top + 78f, headerCellPaint)
+            if (lang == PaperLanguage.URDU) {
+                drawRightAlignedSingleLine(canvas, "نام طالب علم: $studentVal", pageWidth - MARGIN_H - 10f, top + 62f, headerCellPaint)
+                canvas.drawText("رول نمبر: $rollVal", MARGIN_H + 10f, top + 62f, headerCellPaint)
+                drawRightAlignedSingleLine(canvas, "وقت: ${payload.header.timeAllowed}", pageWidth - MARGIN_H - 10f, top + 78f, headerCellPaint)
+                canvas.drawText("کل نمبر: $grandTotalMarks", MARGIN_H + 10f, top + 78f, headerCellPaint)
+            } else {
+                canvas.drawText("Student Name: $studentVal", MARGIN_H + 10f, top + 62f, headerCellPaint)
+                canvas.drawText("Roll No: $rollVal", pageWidth - MARGIN_H - 180f, top + 62f, headerCellPaint)
+                canvas.drawText("Time Allowed: ${payload.header.timeAllowed}", MARGIN_H + 10f, top + 78f, headerCellPaint)
+                canvas.drawText("Total Marks: $grandTotalMarks", pageWidth - MARGIN_H - 180f, top + 78f, headerCellPaint)
+            }
 
             yPos = top + boxH + 12f
         }
@@ -478,20 +540,48 @@ object ExamPdfGenerator {
                 yPos + bannerHeight,
                 sectionFillPaint
             )
-            val label = when (lang) {
-                PaperLanguage.ENGLISH -> "Q.$mainSectionQuestionNumber: $titleEn"
-                PaperLanguage.URDU -> "سوال نمبر $mainSectionQuestionNumber: $titleUr"
-                PaperLanguage.BILINGUAL -> "Q.$mainSectionQuestionNumber: $titleEn  |  سوال نمبر $mainSectionQuestionNumber: $titleUr"
-            }
             val textBaseline = yPos + (bannerHeight * 0.68f)
-            canvas.drawText(label, MARGIN_H + 8f, textBaseline, sectionHeaderPaint)
-            val mw = sectionHeaderPaint.measureText(marksText)
-            canvas.drawText(
-                marksText,
-                pageWidth - MARGIN_H - mw - 8f,
-                textBaseline,
-                sectionHeaderPaint
-            )
+            when (lang) {
+                PaperLanguage.URDU -> {
+                    // RTL Section Banner: Urdu title on the RIGHT, Marks on the LEFT
+                    val urLabel = "سوال نمبر $mainSectionQuestionNumber: $titleUr"
+                    drawRightAlignedSingleLine(
+                        canvas,
+                        urLabel,
+                        pageWidth - MARGIN_H - 8f,
+                        textBaseline,
+                        sectionHeaderPaint
+                    )
+                    canvas.drawText(
+                        marksText,
+                        MARGIN_H + 8f,
+                        textBaseline,
+                        sectionHeaderPaint
+                    )
+                }
+                PaperLanguage.ENGLISH -> {
+                    val enLabel = "Q.$mainSectionQuestionNumber: $titleEn"
+                    canvas.drawText(enLabel, MARGIN_H + 8f, textBaseline, sectionHeaderPaint)
+                    val mw = sectionHeaderPaint.measureText(marksText)
+                    canvas.drawText(
+                        marksText,
+                        pageWidth - MARGIN_H - mw - 8f,
+                        textBaseline,
+                        sectionHeaderPaint
+                    )
+                }
+                PaperLanguage.BILINGUAL -> {
+                    val biLabel = "Q.$mainSectionQuestionNumber: $titleEn  |  سوال نمبر $mainSectionQuestionNumber: $titleUr"
+                    canvas.drawText(biLabel, MARGIN_H + 8f, textBaseline, sectionHeaderPaint)
+                    val mw = sectionHeaderPaint.measureText(marksText)
+                    canvas.drawText(
+                        marksText,
+                        pageWidth - MARGIN_H - mw - 8f,
+                        textBaseline,
+                        sectionHeaderPaint
+                    )
+                }
+            }
             yPos += bannerHeight + 6f
             mainSectionQuestionNumber++
         }
@@ -511,38 +601,55 @@ object ExamPdfGenerator {
                 val num = index + 1
                 val itemStartY = yPos
 
+                val cleanEn = q.resolvedQuestionEn()
+                val cleanUr = q.resolvedQuestionUr()
+                val optAEn = q.resolvedOptionAEn()
+                val optBEn = q.resolvedOptionBEn()
+                val optCEn = q.resolvedOptionCEn()
+                val optDEn = q.resolvedOptionDEn()
+                val optAUr = q.resolvedOptionAUr()
+                val optBUr = q.resolvedOptionBUr()
+                val optCUr = q.resolvedOptionCUr()
+                val optDUr = q.resolvedOptionDUr()
+
                 when (lang) {
                     PaperLanguage.ENGLISH -> {
+                        val enText = cleanEn.ifBlank { q.questionEn }
                         drawMultilineText(
-                            text = "$num. ${q.questionEn}",
-                            paint = bodyBoldPaint,
-                            width = contentWidth - 12,
-                            xOffset = MARGIN_H + 6f
-                        )
-                    }
-                    PaperLanguage.URDU -> {
-                        drawMultilineText(
-                            text = "$num۔ ${q.questionUr}",
+                            text = "$num. $enText",
                             paint = bodyBoldPaint,
                             width = contentWidth - 12,
                             xOffset = MARGIN_H + 6f,
-                            alignment = Layout.Alignment.ALIGN_OPPOSITE
+                            isRtl = false
+                        )
+                    }
+                    PaperLanguage.URDU -> {
+                        val urText = cleanUr.ifBlank { q.questionUr }
+                        drawMultilineText(
+                            text = "$num۔ $urText",
+                            paint = bodyBoldPaint,
+                            width = contentWidth - 12,
+                            xOffset = MARGIN_H + 6f,
+                            isRtl = true
                         )
                     }
                     PaperLanguage.BILINGUAL -> {
-                        drawMultilineText(
-                            text = "$num. ${q.questionEn}",
-                            paint = bodyBoldPaint,
-                            width = contentWidth - 12,
-                            xOffset = MARGIN_H + 6f
-                        )
-                        if (q.questionUr.isNotBlank() && q.questionUr != q.questionEn) {
+                        if (cleanEn.isNotBlank()) {
                             drawMultilineText(
-                                text = q.questionUr,
+                                text = "$num. $cleanEn",
                                 paint = bodyBoldPaint,
                                 width = contentWidth - 12,
                                 xOffset = MARGIN_H + 6f,
-                                alignment = Layout.Alignment.ALIGN_OPPOSITE
+                                isRtl = false
+                            )
+                        }
+                        if (cleanUr.isNotBlank()) {
+                            drawMultilineText(
+                                text = "$num۔ $cleanUr",
+                                paint = bodyBoldPaint,
+                                width = contentWidth - 12,
+                                xOffset = MARGIN_H + 6f,
+                                isRtl = true
                             )
                         }
                     }
@@ -550,24 +657,36 @@ object ExamPdfGenerator {
 
                 // Options Row
                 val optA = when (lang) {
-                    PaperLanguage.ENGLISH -> "(A) ${q.optionAEn}"
-                    PaperLanguage.URDU -> "(الف) ${q.optionAUr}"
-                    PaperLanguage.BILINGUAL -> "(A) ${q.optionAEn}/${q.optionAUr}"
+                    PaperLanguage.ENGLISH -> "(A) ${optAEn.ifBlank { q.optionAEn }}"
+                    PaperLanguage.URDU -> "(الف) ${optAUr.ifBlank { q.optionAUr }}"
+                    PaperLanguage.BILINGUAL -> {
+                        if (optAEn.isNotBlank() && optAUr.isNotBlank() && optAEn != optAUr) "(A) $optAEn / $optAUr"
+                        else "(A) ${optAEn.ifBlank { optAUr }}"
+                    }
                 }
                 val optB = when (lang) {
-                    PaperLanguage.ENGLISH -> "(B) ${q.optionBEn}"
-                    PaperLanguage.URDU -> "(ب) ${q.optionBUr}"
-                    PaperLanguage.BILINGUAL -> "(B) ${q.optionBEn}/${q.optionBUr}"
+                    PaperLanguage.ENGLISH -> "(B) ${optBEn.ifBlank { q.optionBEn }}"
+                    PaperLanguage.URDU -> "(ب) ${optBUr.ifBlank { q.optionBUr }}"
+                    PaperLanguage.BILINGUAL -> {
+                        if (optBEn.isNotBlank() && optBUr.isNotBlank() && optBEn != optBUr) "(B) $optBEn / $optBUr"
+                        else "(B) ${optBEn.ifBlank { optBUr }}"
+                    }
                 }
                 val optC = when (lang) {
-                    PaperLanguage.ENGLISH -> "(C) ${q.optionCEn}"
-                    PaperLanguage.URDU -> "(ج) ${q.optionCUr}"
-                    PaperLanguage.BILINGUAL -> "(C) ${q.optionCEn}/${q.optionCUr}"
+                    PaperLanguage.ENGLISH -> "(C) ${optCEn.ifBlank { q.optionCEn }}"
+                    PaperLanguage.URDU -> "(ج) ${optCUr.ifBlank { q.optionCUr }}"
+                    PaperLanguage.BILINGUAL -> {
+                        if (optCEn.isNotBlank() && optCUr.isNotBlank() && optCEn != optCUr) "(C) $optCEn / $optCUr"
+                        else "(C) ${optCEn.ifBlank { optCUr }}"
+                    }
                 }
                 val optD = when (lang) {
-                    PaperLanguage.ENGLISH -> "(D) ${q.optionDEn}"
-                    PaperLanguage.URDU -> "(د) ${q.optionDUr}"
-                    PaperLanguage.BILINGUAL -> "(D) ${q.optionDEn}/${q.optionDUr}"
+                    PaperLanguage.ENGLISH -> "(D) ${optDEn.ifBlank { q.optionDEn }}"
+                    PaperLanguage.URDU -> "(د) ${optDUr.ifBlank { q.optionDUr }}"
+                    PaperLanguage.BILINGUAL -> {
+                        if (optDEn.isNotBlank() && optDUr.isNotBlank() && optDEn != optDUr) "(D) $optDEn / $optDUr"
+                        else "(D) ${optDEn.ifBlank { optDUr }}"
+                    }
                 }
 
                 if (payload.header.paperVersion == 1) {
@@ -586,10 +705,18 @@ object ExamPdfGenerator {
                     }
                     val textY = yPos + (optRowH * 0.72f)
                     val maxChars = (22 / fontScale).roundToInt().coerceAtLeast(10)
-                    canvas.drawText(optA.take(maxChars), left + 4f, textY, bodyRegularPaint)
-                    canvas.drawText(optB.take(maxChars), left + colW + 4f, textY, bodyRegularPaint)
-                    canvas.drawText(optC.take(maxChars), left + colW * 2 + 4f, textY, bodyRegularPaint)
-                    canvas.drawText(optD.take(maxChars), left + colW * 3 + 4f, textY, bodyRegularPaint)
+                    if (lang == PaperLanguage.URDU) {
+                        // In Urdu RTL Table: (الف) in rightmost column, (ب) in 3rd, (ج) in 2nd, (د) in leftmost column!
+                        drawRightAlignedSingleLine(canvas, optA.take(maxChars), right - 4f, textY, bodyRegularPaint)
+                        drawRightAlignedSingleLine(canvas, optB.take(maxChars), left + colW * 3 - 4f, textY, bodyRegularPaint)
+                        drawRightAlignedSingleLine(canvas, optC.take(maxChars), left + colW * 2 - 4f, textY, bodyRegularPaint)
+                        drawRightAlignedSingleLine(canvas, optD.take(maxChars), left + colW - 4f, textY, bodyRegularPaint)
+                    } else {
+                        canvas.drawText(optA.take(maxChars), left + 4f, textY, bodyRegularPaint)
+                        canvas.drawText(optB.take(maxChars), left + colW + 4f, textY, bodyRegularPaint)
+                        canvas.drawText(optC.take(maxChars), left + colW * 2 + 4f, textY, bodyRegularPaint)
+                        canvas.drawText(optD.take(maxChars), left + colW * 3 + 4f, textY, bodyRegularPaint)
+                    }
 
                     yPos += optRowH + 3f
                     canvas.drawRect(MARGIN_H, itemStartY - 2f, pageWidth - MARGIN_H, yPos, lightGridPaint)
@@ -599,7 +726,7 @@ object ExamPdfGenerator {
                     drawMultilineText(
                         text = optsLine,
                         paint = bodyRegularPaint,
-                        alignment = if (lang == PaperLanguage.URDU) Layout.Alignment.ALIGN_OPPOSITE else Layout.Alignment.ALIGN_NORMAL
+                        isRtl = (lang == PaperLanguage.URDU)
                     )
                     canvas.drawLine(MARGIN_H, yPos, pageWidth - MARGIN_H, yPos, dashedDividerPaint)
                     yPos += 4f
@@ -619,36 +746,84 @@ object ExamPdfGenerator {
             drawSectionBanner(
                 titleEn = "Write short answers to the following questions.",
                 titleUr = "مندرجہ ذیل مختصر سوالات کے جوابات لکھیں۔",
-                marksText = "(Marks: $totalShortMarks)"
+                marksText = if (lang == PaperLanguage.URDU) "(کل نمبر: $totalShortMarks)" else "(Marks: $totalShortMarks)"
             )
 
             payload.shortQuestions.forEachIndexed { index, q ->
                 ensureSpace(28f * fontScale)
                 val roman = toRoman(index + 1)
+                val cleanEn = q.resolvedQuestionEn()
+                val cleanUr = q.resolvedQuestionUr()
+                val marksBadge = "[${q.marks}]"
+                val marksW = bodyBoldPaint.measureText(marksBadge)
+
                 when (lang) {
                     PaperLanguage.ENGLISH -> {
-                        drawMultilineText(
-                            text = "($roman) ${q.questionEn}   [${q.marks}]",
-                            paint = bodyBoldPaint
+                        val enText = cleanEn.ifBlank { q.questionEn }
+                        val rowTopY = yPos
+                        val h = drawMultilineText(
+                            text = "($roman) $enText",
+                            paint = bodyBoldPaint,
+                            width = contentWidth - 44,
+                            xOffset = MARGIN_H + 4f,
+                            isRtl = false,
+                            advanceY = false
                         )
+                        canvas.drawText(
+                            marksBadge,
+                            pageWidth - MARGIN_H - marksW - 4f,
+                            rowTopY + fontPt,
+                            bodyBoldPaint
+                        )
+                        yPos += h + 4f
                     }
                     PaperLanguage.URDU -> {
-                        drawMultilineText(
-                            text = "(${index + 1}) ${q.questionUr}   [${q.marks}]",
+                        // Pure Right-to-Left Urdu Short Question:
+                        // Question number & Urdu text on the RIGHT (RTL), Marks badge "[2]" on the LEFT!
+                        val urText = cleanUr.ifBlank { q.questionUr }
+                        val rowTopY = yPos
+                        val h = drawMultilineText(
+                            text = "(${index + 1}) $urText",
                             paint = bodyBoldPaint,
-                            alignment = Layout.Alignment.ALIGN_OPPOSITE
+                            width = contentWidth - 44,
+                            xOffset = MARGIN_H + 40f,
+                            isRtl = true,
+                            advanceY = false
                         )
+                        canvas.drawText(
+                            marksBadge,
+                            MARGIN_H + 4f,
+                            rowTopY + fontPt,
+                            bodyBoldPaint
+                        )
+                        yPos += h + 4f
                     }
                     PaperLanguage.BILINGUAL -> {
-                        drawMultilineText(
-                            text = "($roman) ${q.questionEn}   [${q.marks}]",
-                            paint = bodyBoldPaint
-                        )
-                        if (q.questionUr.isNotBlank() && q.questionUr != q.questionEn) {
+                        if (cleanEn.isNotBlank()) {
+                            val rowTopY = yPos
+                            val h = drawMultilineText(
+                                text = "($roman) $cleanEn",
+                                paint = bodyBoldPaint,
+                                width = contentWidth - 44,
+                                xOffset = MARGIN_H + 4f,
+                                isRtl = false,
+                                advanceY = false
+                            )
+                            canvas.drawText(
+                                marksBadge,
+                                pageWidth - MARGIN_H - marksW - 4f,
+                                rowTopY + fontPt,
+                                bodyBoldPaint
+                            )
+                            yPos += h + 2f
+                        }
+                        if (cleanUr.isNotBlank()) {
                             drawMultilineText(
-                                text = q.questionUr,
+                                text = "(${index + 1}) $cleanUr",
                                 paint = bodyRegularPaint,
-                                alignment = Layout.Alignment.ALIGN_OPPOSITE
+                                width = contentWidth - 12,
+                                xOffset = MARGIN_H + 6f,
+                                isRtl = true
                             )
                         }
                     }
@@ -665,36 +840,87 @@ object ExamPdfGenerator {
             drawSectionBanner(
                 titleEn = "Answer the following detailed / long questions.",
                 titleUr = "مندرجہ ذیل تفصیلی سوالات کے جوابات دیں۔",
-                marksText = "(Marks: $totalLongMarks)"
+                marksText = if (lang == PaperLanguage.URDU) "(کل نمبر: $totalLongMarks)" else "(Marks: $totalLongMarks)"
             )
 
             payload.longQuestions.forEachIndexed { index, q ->
                 ensureSpace(32f * fontScale)
                 val num = index + 1
+                val cleanEn = q.resolvedQuestionEn()
+                val cleanUr = q.resolvedQuestionUr()
+
                 when (lang) {
                     PaperLanguage.ENGLISH -> {
-                        drawMultilineText(
-                            text = "Q.$num: ${q.questionEn}   (${q.marks} Marks)",
-                            paint = bodyBoldPaint
+                        val enText = cleanEn.ifBlank { q.questionEn }
+                        val marksLabel = "(${q.marks} Marks)"
+                        val marksW = bodyBoldPaint.measureText(marksLabel)
+                        val rowTopY = yPos
+                        val h = drawMultilineText(
+                            text = "Q.$num: $enText",
+                            paint = bodyBoldPaint,
+                            width = contentWidth - 68,
+                            xOffset = MARGIN_H + 4f,
+                            isRtl = false,
+                            advanceY = false
                         )
+                        canvas.drawText(
+                            marksLabel,
+                            pageWidth - MARGIN_H - marksW - 4f,
+                            rowTopY + fontPt,
+                            bodyBoldPaint
+                        )
+                        yPos += h + 4f
                     }
                     PaperLanguage.URDU -> {
-                        drawMultilineText(
-                            text = "($num) ${q.questionUr}   (${q.marks} نمبر)",
+                        // Pure Right-to-Left Urdu Long Question:
+                        // Question number & Urdu text on the RIGHT (RTL), Marks on the LEFT!
+                        val urText = cleanUr.ifBlank { q.questionUr }
+                        val marksLabel = "(${q.marks} نمبر)"
+                        val rowTopY = yPos
+                        val h = drawMultilineText(
+                            text = "سوال نمبر $num: $urText",
                             paint = bodyBoldPaint,
-                            alignment = Layout.Alignment.ALIGN_OPPOSITE
+                            width = contentWidth - 62,
+                            xOffset = MARGIN_H + 58f,
+                            isRtl = true,
+                            advanceY = false
                         )
+                        canvas.drawText(
+                            "\u200F$marksLabel",
+                            MARGIN_H + 4f,
+                            rowTopY + fontPt,
+                            bodyBoldPaint
+                        )
+                        yPos += h + 4f
                     }
                     PaperLanguage.BILINGUAL -> {
-                        drawMultilineText(
-                            text = "Q.$num: ${q.questionEn}   (${q.marks} Marks)",
-                            paint = bodyBoldPaint
-                        )
-                        if (q.questionUr.isNotBlank() && q.questionUr != q.questionEn) {
+                        if (cleanEn.isNotBlank()) {
+                            val marksLabel = "(${q.marks} Marks)"
+                            val marksW = bodyBoldPaint.measureText(marksLabel)
+                            val rowTopY = yPos
+                            val h = drawMultilineText(
+                                text = "Q.$num: $cleanEn",
+                                paint = bodyBoldPaint,
+                                width = contentWidth - 68,
+                                xOffset = MARGIN_H + 4f,
+                                isRtl = false,
+                                advanceY = false
+                            )
+                            canvas.drawText(
+                                marksLabel,
+                                pageWidth - MARGIN_H - marksW - 4f,
+                                rowTopY + fontPt,
+                                bodyBoldPaint
+                            )
+                            yPos += h + 2f
+                        }
+                        if (cleanUr.isNotBlank()) {
                             drawMultilineText(
-                                text = q.questionUr,
+                                text = "سوال نمبر $num: $cleanUr   (${q.marks} نمبر)",
                                 paint = bodyRegularPaint,
-                                alignment = Layout.Alignment.ALIGN_OPPOSITE
+                                width = contentWidth - 12,
+                                xOffset = MARGIN_H + 6f,
+                                isRtl = true
                             )
                         }
                     }
@@ -714,7 +940,8 @@ object ExamPdfGenerator {
             val keySummary = payload.mcqs.mapIndexed { i, q -> "${i + 1}:${q.correctOption}" }.joinToString("   |   ")
             drawMultilineText(
                 text = "Teacher Answer Key (MCQs):   $keySummary",
-                paint = footerPaint
+                paint = footerPaint,
+                isRtl = false
             )
         }
 
