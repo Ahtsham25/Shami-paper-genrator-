@@ -30,6 +30,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
+import android.app.Activity
+
 enum class BottomNavTab {
     HOME,
     SAVED_DOWNLOADS,
@@ -44,6 +46,12 @@ enum class ActiveScreen {
     PRIVACY_POLICY,
     OWNER_ADMIN_APP
 }
+
+data class DownloadedPdfInfo(
+    val file: File,
+    val fileName: String,
+    val publicFolderDisplay: String = ExamPdfGenerator.PUBLIC_DOWNLOAD_FOLDER_DISPLAY
+)
 
 class PaperMakerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -105,13 +113,17 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             languageMode = prefs.getString("default_lang_mode", PaperLanguage.ENGLISH.code) ?: PaperLanguage.ENGLISH.code,
             paperVersion = prefs.getInt("default_paper_version", 1),
             paperSize = prefs.getString("default_paper_size", "A4") ?: "A4",
-            fontSizeScale = prefs.getString("default_font_scale", "MEDIUM") ?: "MEDIUM"
+            fontSizeScale = prefs.getString("default_font_scale", "MEDIUM") ?: "MEDIUM",
+            fontSizePt = prefs.getInt("default_font_size_pt", 12)
         )
     )
     val paperHeader: StateFlow<PaperHeaderConfig> = _paperHeader.asStateFlow()
 
     private val _statusMessage = MutableStateFlow<String?>(null)
     val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
+
+    private val _lastDownloadedPdf = MutableStateFlow<DownloadedPdfInfo?>(null)
+    val lastDownloadedPdf: StateFlow<DownloadedPdfInfo?> = _lastDownloadedPdf.asStateFlow()
 
     private val _isSyncingGitHub = MutableStateFlow(false)
     val isSyncingGitHub: StateFlow<Boolean> = _isSyncingGitHub.asStateFlow()
@@ -150,6 +162,10 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     fun clearStatusMessage() {
         _statusMessage.value = null
+    }
+
+    fun clearLastDownloadedPdf() {
+        _lastDownloadedPdf.value = null
     }
 
     fun showStatus(msg: String) {
@@ -197,8 +213,21 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
     fun openPaperPreview() {
         val totalSelected = _selectedMcqs.value.size + _selectedShortQuestions.value.size + _selectedLongQuestions.value.size
         if (totalSelected == 0) {
-            _statusMessage.value = "Please select at least one question to generate the paper."
-            return
+            val chIds = _selectedChapterIds.value
+            val subj = _selectedSubject.value
+            val pool = when {
+                chIds.isNotEmpty() -> allQuestions.value.filter { it.chapterId in chIds }
+                subj != null -> allQuestions.value.filter { it.subjectId == subj.id }
+                else -> allQuestions.value
+            }
+            val autoMcqs = pool.filter { it.type == QuestionType.MCQ.code }.take(5)
+            val autoShorts = pool.filter { it.type == QuestionType.SHORT.code }.take(4)
+            val autoLongs = pool.filter { it.type == QuestionType.LONG.code }.take(2)
+            if (autoMcqs.isNotEmpty() || autoShorts.isNotEmpty() || autoLongs.isNotEmpty()) {
+                _selectedMcqs.value = autoMcqs
+                _selectedShortQuestions.value = autoShorts
+                _selectedLongQuestions.value = autoLongs
+            }
         }
         _activeScreen.value = ActiveScreen.PAPER_PREVIEW
     }
@@ -380,6 +409,7 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             .putInt("default_paper_version", newHeader.paperVersion)
             .putString("default_paper_size", newHeader.paperSize)
             .putString("default_font_scale", newHeader.fontSizeScale)
+            .putInt("default_font_size_pt", newHeader.fontSizePt)
             .apply()
     }
 
@@ -396,7 +426,32 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun setFontSizeScale(scale: String) {
-        updatePaperHeader(_paperHeader.value.copy(fontSizeScale = scale))
+        val mappedPt = when (scale.uppercase()) {
+            "SMALL" -> 10
+            "LARGE" -> 15
+            else -> 12
+        }
+        updatePaperHeader(
+            _paperHeader.value.copy(
+                fontSizeScale = scale,
+                fontSizePt = mappedPt
+            )
+        )
+    }
+
+    fun setFontSizePt(pt: Int) {
+        val clamped = pt.coerceIn(8, 24)
+        val scaleLabel = when {
+            clamped <= 10 -> "SMALL"
+            clamped >= 14 -> "LARGE"
+            else -> "MEDIUM"
+        }
+        updatePaperHeader(
+            _paperHeader.value.copy(
+                fontSizePt = clamped,
+                fontSizeScale = scaleLabel
+            )
+        )
     }
 
     fun calculateTotalMarks(): Int {
@@ -455,12 +510,41 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             dao.insertSavedPaper(entity)
 
             if (generatedPdfFile != null) {
-                _statusMessage.value = "Paper saved & PDF downloaded (${generatedPdfFile.name})!"
+                _lastDownloadedPdf.value = DownloadedPdfInfo(
+                    file = generatedPdfFile,
+                    fileName = generatedPdfFile.name
+                )
+                _statusMessage.value = "Saved in Phone: ${ExamPdfGenerator.PUBLIC_DOWNLOAD_FOLDER_DISPLAY}/${generatedPdfFile.name}"
                 if (sharePdfAfterExport) {
                     ExamPdfGenerator.shareOrOpenPdf(getApplication(), generatedPdfFile, share = true)
                 }
             } else {
-                _statusMessage.value = "Paper saved to Downloads & Saved tab!"
+                _statusMessage.value = "Paper saved to Saved & Downloads tab!"
+            }
+        }
+    }
+
+    fun printCurrentPaper(activity: Activity) {
+        viewModelScope.launch {
+            try {
+                val payload = buildCurrentPaperPayload()
+                val pdfFile = ExamPdfGenerator.generateExamPdf(getApplication(), payload)
+                ExamPdfGenerator.printExamPdf(activity, pdfFile, pdfFile.nameWithoutExtension)
+            } catch (e: Exception) {
+                _statusMessage.value = "Print failed: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    fun printSavedPaper(activity: Activity, savedPaper: SavedPaperEntity) {
+        viewModelScope.launch {
+            val payload = gitHubService.decodeSavedPaperPayload(savedPaper.payloadJson) ?: return@launch
+            try {
+                val pdfFile = ExamPdfGenerator.generateExamPdf(getApplication(), payload)
+                dao.insertSavedPaper(savedPaper.copy(pdfFilePath = pdfFile.absolutePath))
+                ExamPdfGenerator.printExamPdf(activity, pdfFile, pdfFile.nameWithoutExtension)
+            } catch (e: Exception) {
+                _statusMessage.value = "Print failed: ${e.localizedMessage}"
             }
         }
     }
@@ -485,7 +569,7 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             try {
                 val pdfFile = ExamPdfGenerator.generateExamPdf(getApplication(), payload)
                 dao.insertSavedPaper(savedPaper.copy(pdfFilePath = pdfFile.absolutePath))
-                _statusMessage.value = "PDF ready: ${pdfFile.name}"
+                _statusMessage.value = "Saved in Phone: ${ExamPdfGenerator.PUBLIC_DOWNLOAD_FOLDER_DISPLAY}/${pdfFile.name}"
                 ExamPdfGenerator.shareOrOpenPdf(getApplication(), pdfFile, share = share)
             } catch (e: Exception) {
                 _statusMessage.value = "PDF generation failed: ${e.localizedMessage}"
@@ -602,11 +686,13 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             val adState = AdManager.state.value
             val payload = GitHubPaperBankPayload(
                 adConfig = RemoteAdConfig(
+                    adsEnabled = adState.adsEnabled,
                     useTestAds = adState.useTestAds,
                     appId = adState.appId,
                     bannerAdUnitId = adState.bannerAdUnitId,
                     interstitialAdUnitId = adState.interstitialAdUnitId,
-                    rewardedAdUnitId = adState.rewardedAdUnitId
+                    rewardedAdUnitId = adState.rewardedAdUnitId,
+                    updatedAt = System.currentTimeMillis()
                 ),
                 subjects = dao.getAllSubjectsOnce(),
                 chapters = dao.getAllChaptersOnce(),

@@ -62,17 +62,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.app.Activity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ads.AdManager
 import com.example.ads.AdMobBannerBar
-import com.example.ads.AutoPlayingRewardedAdOverlay
-import com.example.data.ChapterEntity
 import com.example.data.PaperLanguage
 import com.example.data.QuestionEntity
 import com.example.data.QuestionType
@@ -85,29 +86,18 @@ fun SubjectChaptersScreen(
 ) {
     BackHandler { viewModel.navigateBack() }
 
+    val context = LocalContext.current
+    val activity = context as? Activity
     val subject by viewModel.selectedSubject.collectAsState()
     val allChapters by viewModel.allChapters.collectAsState()
     val allQuestions by viewModel.allQuestions.collectAsState()
     val selectedChapterIds by viewModel.selectedChapterIds.collectAsState()
     val unlockedChapterIds by viewModel.unlockedChapterIds.collectAsState()
+    val adState by AdManager.state.collectAsState()
 
     val currentSubject = subject ?: return
     val chapters = remember(allChapters, currentSubject.id) {
         allChapters.filter { it.subjectId == currentSubject.id }.sortedBy { it.chapterNumber }
-    }
-
-    var chapterToUnlockViaAd by remember { mutableStateOf<ChapterEntity?>(null) }
-
-    if (chapterToUnlockViaAd != null) {
-        val ch = chapterToUnlockViaAd!!
-        AutoPlayingRewardedAdOverlay(
-            itemTitle = ch.titleEn,
-            onDismiss = { chapterToUnlockViaAd = null },
-            onUnlocked = {
-                viewModel.unlockChapterViaRewardedAd(ch.id)
-                chapterToUnlockViaAd = null
-            }
-        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -149,7 +139,8 @@ fun SubjectChaptersScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(chapters, key = { it.id }) { chapter ->
-                val isUnlocked = (chapter.chapterNumber == 1) ||
+                val isUnlocked = !adState.adsEnabled ||
+                    (chapter.chapterNumber == 1) ||
                     chapter.isFreeByDefault ||
                     unlockedChapterIds.contains(chapter.id)
 
@@ -167,8 +158,14 @@ fun SubjectChaptersScreen(
                             if (isUnlocked) {
                                 viewModel.toggleChapterSelection(chapter)
                             } else {
-                                // Immediately play Rewarded Ad when locked chapter is tapped!
-                                chapterToUnlockViaAd = chapter
+                                // Immediately launch the real Google AdMob full-screen Rewarded Ad (no intermediate dialog!)
+                                AdManager.triggerRewardedUnlock(
+                                    activity = activity,
+                                    context = context,
+                                    onUnlocked = {
+                                        viewModel.unlockChapterViaRewardedAd(chapter.id)
+                                    }
+                                )
                             }
                         }
                         .border(
@@ -335,7 +332,7 @@ fun QuestionPickerAndBuilderScreen(
                         fontSize = 17.sp
                     )
                     Text(
-                        text = "Total Marks: $totalMarks  •  Q.1 MCQs (${selectedMcqs.size}) | Q.2 Short (${selectedShorts.size}) | Q.3 Long (${selectedLongs.size})",
+                        text = "Marks: $totalMarks • MCQs(${selectedMcqs.size}) | Short(${selectedShorts.size}) | Long(${selectedLongs.size})",
                         fontSize = 11.sp,
                         color = Color(0xFFFFD700)
                     )
@@ -348,6 +345,26 @@ fun QuestionPickerAndBuilderScreen(
                         contentDescription = "Back",
                         tint = Color.White
                     )
+                }
+            },
+            actions = {
+                Button(
+                    onClick = { viewModel.openPaperPreview() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF0D9488),
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = "Full Preview",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Full Preview", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -392,6 +409,12 @@ fun QuestionPickerAndBuilderScreen(
                 text = { Text("Drag & Drop + Header", fontWeight = FontWeight.Bold) },
                 modifier = Modifier.testTag("tab_drag_and_header")
             )
+            Tab(
+                selected = selectedTabIndex == 4,
+                onClick = { selectedTabIndex = 4 },
+                text = { Text("Full Preview (A4/Legal)", fontWeight = FontWeight.ExtraBold) },
+                modifier = Modifier.testTag("tab_live_full_preview")
+            )
         }
 
         Box(
@@ -430,6 +453,11 @@ fun QuestionPickerAndBuilderScreen(
                 3 -> DragAndDropAndHeaderEditorTab(
                     viewModel = viewModel
                 )
+                4 -> PaperPreviewWorkspaceContent(
+                    viewModel = viewModel,
+                    onOpenFullScreen = { viewModel.openPaperPreview() },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
 
@@ -454,7 +482,7 @@ fun QuestionPickerAndBuilderScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Q.1 MCQs: ${selectedMcqs.size} • Q.2 Short: ${selectedShorts.size} • Q.3 Long: ${selectedLongs.size}",
+                            text = "${paperHeader.paperSize} • Font ${paperHeader.fontSizePt}pt • Q1:${selectedMcqs.size} | Q2:${selectedShorts.size} | Q3:${selectedLongs.size}",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -472,7 +500,7 @@ fun QuestionPickerAndBuilderScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Generate Paper", fontWeight = FontWeight.Bold)
+                        Text("Full Preview & PDF", fontWeight = FontWeight.Bold)
                     }
                 }
                 AdMobBannerBar()

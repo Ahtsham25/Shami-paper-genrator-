@@ -790,11 +790,31 @@ private fun AdminAdMobConfigTab(
     val context = LocalContext.current
     val adState by AdManager.state.collectAsState()
 
+    var adsEnabled by remember(adState.adsEnabled) { mutableStateOf(adState.adsEnabled) }
     var useTestAds by remember(adState.useTestAds) { mutableStateOf(adState.useTestAds) }
     var appId by remember(adState.appId) { mutableStateOf(adState.appId) }
     var bannerId by remember(adState.bannerAdUnitId) { mutableStateOf(adState.bannerAdUnitId) }
     var interstitialId by remember(adState.interstitialAdUnitId) { mutableStateOf(adState.interstitialAdUnitId) }
     var rewardedId by remember(adState.rewardedAdUnitId) { mutableStateOf(adState.rewardedAdUnitId) }
+
+    fun saveImmediately(
+        newAdsEnabled: Boolean = adsEnabled,
+        newUseTestAds: Boolean = useTestAds,
+        newAppId: String = appId,
+        newBannerId: String = bannerId,
+        newInterstitialId: String = interstitialId,
+        newRewardedId: String = rewardedId
+    ) {
+        AdManager.updateAdConfig(
+            context = context,
+            adsEnabled = newAdsEnabled,
+            useTestAds = newUseTestAds,
+            appId = newAppId,
+            bannerId = newBannerId,
+            interstitialId = newInterstitialId,
+            rewardedId = newRewardedId
+        )
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -814,12 +834,13 @@ private fun AdminAdMobConfigTab(
                         Icon(Icons.Default.AdsClick, contentDescription = null, tint = Color(0xFFF59E0B))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Remote AdMob Manager (Test Ads vs Live Ads)",
+                            text = "Google AdMob Manager (Instant Auto-Save)",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
+                    // SWITCH 1: Master Switch to Turn All Google Ads ON or OFF
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -831,24 +852,66 @@ private fun AdminAdMobConfigTab(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (useTestAds) "Google Test Ads: ON" else "LIVE AdMob Ads: ON (Test Ads OFF)",
+                                text = if (adsEnabled) "Google Ads in App: ON" else "Google Ads in App: OFF (Disabled)",
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (adsEnabled) Color(0xFF10B981) else MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "Turn OFF to completely disable all Banner, Interstitial & Rewarded Ads in the app.",
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = adsEnabled,
+                            onCheckedChange = { newValue ->
+                                adsEnabled = newValue
+                                saveImmediately(newAdsEnabled = newValue)
+                                viewModel.showStatus(
+                                    if (newValue) "Google Ads turned ON & saved!" else "Google Ads turned OFF & saved!"
+                                )
+                            }
+                        )
+                    }
+
+                    // SWITCH 2: Test Ads vs Live AdMob IDs
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (useTestAds) "Google Test Ads Mode: ON" else "Live AdMob IDs Mode: ON (Test Ads OFF)",
                                 fontWeight = FontWeight.Bold,
                                 color = if (useTestAds) Color(0xFFF59E0B) else Color(0xFF10B981)
                             )
                             Text(
-                                text = "Turn OFF this switch when entering your real Google AdMob IDs.",
+                                text = "Turn OFF this switch to use your own real Google AdMob IDs below. Saved automatically on toggle.",
                                 fontSize = 11.sp
                             )
                         }
                         Switch(
                             checked = useTestAds,
-                            onCheckedChange = { useTestAds = it }
+                            onCheckedChange = { newValue ->
+                                useTestAds = newValue
+                                saveImmediately(newUseTestAds = newValue)
+                                viewModel.showStatus(
+                                    if (newValue) "Test Ads Mode ON & saved!" else "Test Ads Mode OFF (Live IDs Active) & saved!"
+                                )
+                            }
                         )
                     }
 
                     OutlinedTextField(
                         value = appId,
-                        onValueChange = { appId = it },
+                        onValueChange = {
+                            appId = it
+                            saveImmediately(newAppId = it)
+                        },
                         label = { Text("AdMob App ID") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -856,7 +919,10 @@ private fun AdminAdMobConfigTab(
 
                     OutlinedTextField(
                         value = bannerId,
-                        onValueChange = { bannerId = it },
+                        onValueChange = {
+                            bannerId = it
+                            saveImmediately(newBannerId = it)
+                        },
                         label = { Text("Banner Ad Unit ID") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -864,7 +930,10 @@ private fun AdminAdMobConfigTab(
 
                     OutlinedTextField(
                         value = interstitialId,
-                        onValueChange = { interstitialId = it },
+                        onValueChange = {
+                            interstitialId = it
+                            saveImmediately(newInterstitialId = it)
+                        },
                         label = { Text("Interstitial Ad Unit ID") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -872,7 +941,10 @@ private fun AdminAdMobConfigTab(
 
                     OutlinedTextField(
                         value = rewardedId,
-                        onValueChange = { rewardedId = it },
+                        onValueChange = {
+                            rewardedId = it
+                            saveImmediately(newRewardedId = it)
+                        },
                         label = { Text("Rewarded Ad Unit ID (Book & Chapter Unlocks)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -880,14 +952,7 @@ private fun AdminAdMobConfigTab(
 
                     Button(
                         onClick = {
-                            AdManager.updateAdConfig(
-                                context = context,
-                                useTestAds = useTestAds,
-                                appId = appId,
-                                bannerId = bannerId,
-                                interstitialId = interstitialId,
-                                rewardedId = rewardedId
-                            )
+                            saveImmediately()
                             onPushToMainApp()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
@@ -895,7 +960,7 @@ private fun AdminAdMobConfigTab(
                     ) {
                         Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Save & Push AdMob Config to Main App", fontWeight = FontWeight.Bold)
+                        Text("Save & Push AdMob Config to GitHub", fontWeight = FontWeight.Bold)
                     }
                 }
             }

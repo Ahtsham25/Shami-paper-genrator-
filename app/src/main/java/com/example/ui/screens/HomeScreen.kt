@@ -59,6 +59,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import android.app.Activity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -66,8 +68,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ads.AdManager
 import com.example.ads.AdMobBannerBar
-import com.example.ads.AutoPlayingRewardedAdOverlay
 import com.example.data.PaperLanguage
 import com.example.data.SubjectEntity
 import com.example.ui.PaperMakerViewModel
@@ -76,30 +78,18 @@ import com.example.ui.PaperMakerViewModel
 fun HomeScreen(
     viewModel: PaperMakerViewModel
 ) {
+    val context = LocalContext.current
+    val activity = context as? Activity
     val subjects by viewModel.allSubjects.collectAsState()
     val chapters by viewModel.allChapters.collectAsState()
     val questions by viewModel.allQuestions.collectAsState()
     val selectedClass by viewModel.selectedClassLevel.collectAsState()
     val unlockedSubjectIds by viewModel.unlockedSubjectIds.collectAsState()
     val paperHeader by viewModel.paperHeader.collectAsState()
+    val adState by AdManager.state.collectAsState()
 
     val filteredSubjects = remember(subjects, selectedClass) {
         subjects.filter { it.classLevel == selectedClass }.sortedBy { it.orderIndex }
-    }
-
-    var subjectToUnlockViaAd by remember { mutableStateOf<SubjectEntity?>(null) }
-
-    if (subjectToUnlockViaAd != null) {
-        val targetSubj = subjectToUnlockViaAd!!
-        AutoPlayingRewardedAdOverlay(
-            itemTitle = "${targetSubj.nameEn} (Class ${targetSubj.classLevel}th)",
-            onDismiss = { subjectToUnlockViaAd = null },
-            onUnlocked = {
-                viewModel.unlockSubjectViaRewardedAd(targetSubj.id)
-                subjectToUnlockViaAd = null
-                viewModel.openSubject(targetSubj)
-            }
-        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -156,7 +146,8 @@ fun HomeScreen(
             items(filteredSubjects, key = { it.id }) { subject ->
                 val subjectChapters = chapters.filter { it.subjectId == subject.id }
                 val subjectQuestions = questions.filter { it.subjectId == subject.id }
-                val isBookUnlocked = subject.orderIndex == 0 ||
+                val isBookUnlocked = !adState.adsEnabled ||
+                    subject.orderIndex == 0 ||
                     subject.isFreeByDefault ||
                     unlockedSubjectIds.contains(subject.id)
 
@@ -169,8 +160,15 @@ fun HomeScreen(
                         if (isBookUnlocked) {
                             viewModel.openSubject(subject)
                         } else {
-                            // Tapping a locked book immediately starts playing the Rewarded Ad!
-                            subjectToUnlockViaAd = subject
+                            // Immediately launch the real Google AdMob full-screen Rewarded Ad (no intermediate dialog!)
+                            AdManager.triggerRewardedUnlock(
+                                activity = activity,
+                                context = context,
+                                onUnlocked = {
+                                    viewModel.unlockSubjectViaRewardedAd(subject.id)
+                                    viewModel.openSubject(subject)
+                                }
+                            )
                         }
                     }
                 )

@@ -81,8 +81,13 @@ data class PaperHeaderConfig(
     val paperVersion: Int = 1,          // 1 = Version 1 (Table Layout), 2 = Version 2 (Classic Layout)
     val paperSize: String = "A4",       // "A4" or "LEGAL"
     val fontSizeScale: String = "MEDIUM", // "SMALL", "MEDIUM", "LARGE"
+    val fontSizePt: Int = 12,           // Exact font size in pt (8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24)
     val includeAnswerKey: Boolean = true
-)
+) {
+    fun effectiveFontScale(): Float {
+        return fontSizePt.coerceIn(8, 24) / 12f
+    }
+}
 
 data class SavedPaperPayload(
     val header: PaperHeaderConfig,
@@ -111,11 +116,13 @@ data class SavedPaperEntity(
 )
 
 data class RemoteAdConfig(
+    val adsEnabled: Boolean = true,
     val useTestAds: Boolean = true,
     val appId: String = "ca-app-pub-3940256099942544~3347511713",
     val bannerAdUnitId: String = "ca-app-pub-3940256099942544/6300978111",
     val interstitialAdUnitId: String = "ca-app-pub-3940256099942544/1033173712",
-    val rewardedAdUnitId: String = "ca-app-pub-3940256099942544/5224354917"
+    val rewardedAdUnitId: String = "ca-app-pub-3940256099942544/5224354917",
+    val updatedAt: Long = 0L
 )
 
 data class GitHubPaperBankPayload(

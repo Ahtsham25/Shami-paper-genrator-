@@ -241,6 +241,13 @@
       </p>
       <div class="grid-2">
         <div>
+          <label>Google Ads Master Switch</label>
+          <select id="adsEnabledSelect">
+            <option value="true">Google Ads ON (Show Ads)</option>
+            <option value="false">Google Ads OFF (Disable All Ads)</option>
+          </select>
+        </div>
+        <div>
           <label>Ad Mode</label>
           <select id="adModeSelect">
             <option value="true">Google Test Ads (For Testing)</option>
@@ -517,11 +524,13 @@
 
     function syncAdConfigFromInputs() {
       bankData.adConfig = {
+        adsEnabled: document.getElementById("adsEnabledSelect").value === "true",
         useTestAds: document.getElementById("adModeSelect").value === "true",
         appId: document.getElementById("adAppId").value.trim(),
         bannerAdUnitId: document.getElementById("adBannerId").value.trim(),
         interstitialAdUnitId: "ca-app-pub-3940256099942544/1033173712",
-        rewardedAdUnitId: document.getElementById("adRewardedId").value.trim()
+        rewardedAdUnitId: document.getElementById("adRewardedId").value.trim(),
+        updatedAt: Date.now()
       };
       bankData.updatedAt = Date.now();
     }
