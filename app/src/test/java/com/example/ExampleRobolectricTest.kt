@@ -117,4 +117,34 @@ class ExampleRobolectricTest {
         assertTrue(pdfFile.length() > 0)
         assertEquals("Downloads / ShamiPaperMaker", ExamPdfGenerator.PUBLIC_DOWNLOAD_FOLDER_DISPLAY)
     }
+
+    @Test
+    fun `decode and encode shami_paper_bank json without reflection`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val service = com.example.data.GitHubSyncService(context)
+        val subjects = SeedData.defaultSubjects()
+        val chapters = SeedData.defaultChapters(subjects)
+        val questions = SeedData.defaultQuestions(chapters, subjects).take(20)
+        val bank = com.example.data.GitHubPaperBankPayload(
+            adConfig = RemoteAdConfig(
+                adsEnabled = true,
+                useTestAds = false,
+                appId = "ca-app-pub-7176096961346798~8100185751",
+                bannerAdUnitId = "ca-app-pub-7176096961346798/4853277026",
+                interstitialAdUnitId = "ca-app-pub-7176096961346798/1439315235",
+                rewardedAdUnitId = "ca-app-pub-7176096961346798/9438850135",
+                updatedAt = 1773131731742L
+            ),
+            subjects = subjects,
+            chapters = chapters,
+            questions = questions
+        )
+        val encoded = service.encodeBankToJson(bank)
+        val decoded = service.decodeBankFromJson(encoded)
+        assertNotNull(decoded)
+        assertEquals(subjects.size, decoded!!.subjects.size)
+        assertEquals(chapters.size, decoded.chapters.size)
+        assertEquals(20, decoded.questions.size)
+        assertEquals("ca-app-pub-7176096961346798/4853277026", decoded.adConfig?.bannerAdUnitId)
+    }
 }

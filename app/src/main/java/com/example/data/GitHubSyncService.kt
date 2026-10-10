@@ -3,14 +3,13 @@ package com.example.data
 import android.content.Context
 import android.util.Base64
 import com.example.BuildConfig
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -39,33 +38,263 @@ class GitHubSyncService(private val context: Context) {
         .writeTimeout(25, TimeUnit.SECONDS)
         .build()
 
-    val moshi: Moshi = Moshi.Builder()
-        .addLast(KotlinJsonAdapterFactory())
-        .build()
+    private fun questionToJson(q: QuestionEntity): JSONObject {
+        return JSONObject().apply {
+            put("id", q.id)
+            put("chapterId", q.chapterId)
+            put("subjectId", q.subjectId)
+            put("classLevel", q.classLevel)
+            put("type", q.type)
+            put("questionEn", q.questionEn)
+            put("questionUr", q.questionUr)
+            put("optionAEn", q.optionAEn)
+            put("optionBEn", q.optionBEn)
+            put("optionCEn", q.optionCEn)
+            put("optionDEn", q.optionDEn)
+            put("optionAUr", q.optionAUr)
+            put("optionBUr", q.optionBUr)
+            put("optionCUr", q.optionCUr)
+            put("optionDUr", q.optionDUr)
+            put("correctOption", q.correctOption)
+            put("marks", q.marks)
+            put("sortOrder", q.sortOrder)
+        }
+    }
 
-    private val payloadAdapter = moshi.adapter(GitHubPaperBankPayload::class.java).indent("  ")
-    private val savedPaperPayloadAdapter = moshi.adapter(SavedPaperPayload::class.java)
+    private fun jsonToQuestion(obj: JSONObject): QuestionEntity {
+        val type = obj.optString("type", "SHORT")
+        val defaultMarks = when (type.uppercase()) {
+            "MCQ" -> 1
+            "LONG" -> 5
+            else -> 2
+        }
+        return QuestionEntity(
+            id = obj.optString("id", ""),
+            chapterId = obj.optString("chapterId", ""),
+            subjectId = obj.optString("subjectId", ""),
+            classLevel = obj.optString("classLevel", "9"),
+            type = type,
+            questionEn = obj.optString("questionEn", ""),
+            questionUr = obj.optString("questionUr", ""),
+            optionAEn = obj.optString("optionAEn", ""),
+            optionBEn = obj.optString("optionBEn", ""),
+            optionCEn = obj.optString("optionCEn", ""),
+            optionDEn = obj.optString("optionDEn", ""),
+            optionAUr = obj.optString("optionAUr", ""),
+            optionBUr = obj.optString("optionBUr", ""),
+            optionCUr = obj.optString("optionCUr", ""),
+            optionDUr = obj.optString("optionDUr", ""),
+            correctOption = obj.optString("correctOption", "A").ifBlank { "A" },
+            marks = obj.optInt("marks", defaultMarks),
+            sortOrder = obj.optInt("sortOrder", 0)
+        )
+    }
 
     fun encodeSavedPaperPayload(payload: SavedPaperPayload): String {
-        return savedPaperPayloadAdapter.toJson(payload)
+        val root = JSONObject()
+        val h = payload.header
+        val headerObj = JSONObject().apply {
+            put("institutionName", h.institutionName)
+            put("examTitle", h.examTitle)
+            put("studentNameValue", h.studentNameValue)
+            put("rollNumberValue", h.rollNumberValue)
+            put("classLabel", h.classLabel)
+            put("subjectNameEn", h.subjectNameEn)
+            put("subjectNameUr", h.subjectNameUr)
+            put("timeAllowed", h.timeAllowed)
+            put("languageMode", h.languageMode)
+            put("paperVersion", h.paperVersion)
+            put("paperSize", h.paperSize)
+            put("fontSizeScale", h.fontSizeScale)
+            put("fontSizePt", h.fontSizePt)
+            put("includeAnswerKey", h.includeAnswerKey)
+        }
+        root.put("header", headerObj)
+        root.put("mcqs", JSONArray().apply { payload.mcqs.forEach { put(questionToJson(it)) } })
+        root.put("shortQuestions", JSONArray().apply { payload.shortQuestions.forEach { put(questionToJson(it)) } })
+        root.put("longQuestions", JSONArray().apply { payload.longQuestions.forEach { put(questionToJson(it)) } })
+        return root.toString()
     }
 
     fun decodeSavedPaperPayload(json: String): SavedPaperPayload? {
         return try {
-            savedPaperPayloadAdapter.fromJson(json)
-        } catch (e: Exception) {
+            val root = JSONObject(json)
+            val hObj = root.optJSONObject("header") ?: JSONObject()
+            val header = PaperHeaderConfig(
+                institutionName = hObj.optString("institutionName", "SHAMI ACADEMY"),
+                examTitle = hObj.optString("examTitle", "Term Examination"),
+                studentNameValue = hObj.optString("studentNameValue", ""),
+                rollNumberValue = hObj.optString("rollNumberValue", ""),
+                classLabel = hObj.optString("classLabel", "Class 9th"),
+                subjectNameEn = hObj.optString("subjectNameEn", "Chemistry"),
+                subjectNameUr = hObj.optString("subjectNameUr", "کیمسٹری"),
+                timeAllowed = hObj.optString("timeAllowed", "2:00 Hours"),
+                languageMode = hObj.optString("languageMode", PaperLanguage.ENGLISH.code),
+                paperVersion = hObj.optInt("paperVersion", 1),
+                paperSize = hObj.optString("paperSize", "A4"),
+                fontSizeScale = hObj.optString("fontSizeScale", "MEDIUM"),
+                fontSizePt = hObj.optInt("fontSizePt", 12),
+                includeAnswerKey = hObj.optBoolean("includeAnswerKey", true)
+            )
+            fun parseQList(arr: JSONArray?): List<QuestionEntity> {
+                if (arr == null) return emptyList()
+                val list = mutableListOf<QuestionEntity>()
+                for (i in 0 until arr.length()) {
+                    val item = arr.optJSONObject(i) ?: continue
+                    list.add(jsonToQuestion(item))
+                }
+                return list
+            }
+            SavedPaperPayload(
+                header = header,
+                mcqs = parseQList(root.optJSONArray("mcqs")),
+                shortQuestions = parseQList(root.optJSONArray("shortQuestions")),
+                longQuestions = parseQList(root.optJSONArray("longQuestions"))
+            )
+        } catch (t: Throwable) {
             null
         }
     }
 
     fun encodeBankToJson(payload: GitHubPaperBankPayload): String {
-        return payloadAdapter.toJson(payload)
+        val root = JSONObject()
+        root.put("version", payload.version)
+        root.put("updatedBy", payload.updatedBy)
+        root.put("updatedAt", payload.updatedAt)
+        payload.adConfig?.let { ad ->
+            val adObj = JSONObject().apply {
+                put("adsEnabled", ad.adsEnabled)
+                put("useTestAds", ad.useTestAds)
+                put("appId", ad.appId)
+                put("bannerAdUnitId", ad.bannerAdUnitId)
+                put("interstitialAdUnitId", ad.interstitialAdUnitId)
+                put("rewardedAdUnitId", ad.rewardedAdUnitId)
+                put("updatedAt", ad.updatedAt)
+            }
+            root.put("adConfig", adObj)
+        }
+        val subjectsArr = JSONArray()
+        for (s in payload.subjects) {
+            subjectsArr.put(
+                JSONObject().apply {
+                    put("id", s.id)
+                    put("classLevel", s.classLevel)
+                    put("orderIndex", s.orderIndex)
+                    put("nameEn", s.nameEn)
+                    put("nameUr", s.nameUr)
+                    put("iconKey", s.iconKey)
+                    put("colorHex", s.colorHex)
+                    put("isFreeByDefault", s.isFreeByDefault)
+                }
+            )
+        }
+        root.put("subjects", subjectsArr)
+
+        val chaptersArr = JSONArray()
+        for (c in payload.chapters) {
+            chaptersArr.put(
+                JSONObject().apply {
+                    put("id", c.id)
+                    put("subjectId", c.subjectId)
+                    put("classLevel", c.classLevel)
+                    put("chapterNumber", c.chapterNumber)
+                    put("titleEn", c.titleEn)
+                    put("titleUr", c.titleUr)
+                    put("isFreeByDefault", c.isFreeByDefault)
+                }
+            )
+        }
+        root.put("chapters", chaptersArr)
+
+        val questionsArr = JSONArray()
+        for (q in payload.questions) {
+            questionsArr.put(questionToJson(q))
+        }
+        root.put("questions", questionsArr)
+
+        return root.toString(2)
     }
 
     fun decodeBankFromJson(json: String): GitHubPaperBankPayload? {
         return try {
-            payloadAdapter.fromJson(json)
-        } catch (e: Exception) {
+            val root = JSONObject(json)
+            val version = root.optInt("version", 1)
+            val updatedBy = root.optString("updatedBy", "Paper Maker by Shami Academy Admin")
+            val updatedAt = root.optLong("updatedAt", System.currentTimeMillis())
+
+            val adObj = root.optJSONObject("adConfig")
+            val adConfig = if (adObj != null) {
+                RemoteAdConfig(
+                    adsEnabled = adObj.optBoolean("adsEnabled", true),
+                    useTestAds = adObj.optBoolean("useTestAds", true),
+                    appId = adObj.optString("appId", "ca-app-pub-3940256099942544~3347511713"),
+                    bannerAdUnitId = adObj.optString("bannerAdUnitId", "ca-app-pub-3940256099942544/6300978111"),
+                    interstitialAdUnitId = adObj.optString("interstitialAdUnitId", "ca-app-pub-3940256099942544/1033173712"),
+                    rewardedAdUnitId = adObj.optString("rewardedAdUnitId", "ca-app-pub-3940256099942544/5224354917"),
+                    updatedAt = adObj.optLong("updatedAt", 0L)
+                )
+            } else null
+
+            val subjects = mutableListOf<SubjectEntity>()
+            val sArr = root.optJSONArray("subjects")
+            if (sArr != null) {
+                for (i in 0 until sArr.length()) {
+                    val sObj = sArr.optJSONObject(i) ?: continue
+                    val orderIdx = sObj.optInt("orderIndex", i)
+                    subjects.add(
+                        SubjectEntity(
+                            id = sObj.optString("id", ""),
+                            classLevel = sObj.optString("classLevel", "9"),
+                            orderIndex = orderIdx,
+                            nameEn = sObj.optString("nameEn", ""),
+                            nameUr = sObj.optString("nameUr", ""),
+                            iconKey = sObj.optString("iconKey", "menu_book"),
+                            colorHex = sObj.optString("colorHex", "#0D9488"),
+                            isFreeByDefault = sObj.optBoolean("isFreeByDefault", orderIdx == 0)
+                        )
+                    )
+                }
+            }
+
+            val chapters = mutableListOf<ChapterEntity>()
+            val cArr = root.optJSONArray("chapters")
+            if (cArr != null) {
+                for (i in 0 until cArr.length()) {
+                    val cObj = cArr.optJSONObject(i) ?: continue
+                    val chNum = cObj.optInt("chapterNumber", i + 1)
+                    chapters.add(
+                        ChapterEntity(
+                            id = cObj.optString("id", ""),
+                            subjectId = cObj.optString("subjectId", ""),
+                            classLevel = cObj.optString("classLevel", "9"),
+                            chapterNumber = chNum,
+                            titleEn = cObj.optString("titleEn", ""),
+                            titleUr = cObj.optString("titleUr", ""),
+                            isFreeByDefault = cObj.optBoolean("isFreeByDefault", chNum == 1)
+                        )
+                    )
+                }
+            }
+
+            val questions = mutableListOf<QuestionEntity>()
+            val qArr = root.optJSONArray("questions")
+            if (qArr != null) {
+                for (i in 0 until qArr.length()) {
+                    val qObj = qArr.optJSONObject(i) ?: continue
+                    questions.add(jsonToQuestion(qObj))
+                }
+            }
+
+            GitHubPaperBankPayload(
+                version = version,
+                updatedBy = updatedBy,
+                updatedAt = updatedAt,
+                adConfig = adConfig,
+                subjects = subjects,
+                chapters = chapters,
+                questions = questions
+            )
+        } catch (t: Throwable) {
             null
         }
     }
@@ -194,8 +423,8 @@ class GitHubSyncService(private val context: Context) {
                     GitHubSyncResult.Error("GitHub API Error (${resp.code}): ${errBody.take(180)}")
                 }
             }
-        } catch (e: Exception) {
-            GitHubSyncResult.Error("Network error while uploading to GitHub: ${e.localizedMessage ?: "Unknown error"}")
+        } catch (t: Throwable) {
+            GitHubSyncResult.Error("Network error while uploading to GitHub: ${t.localizedMessage ?: "Unknown error"}")
         }
     }
 
@@ -236,8 +465,8 @@ class GitHubSyncService(private val context: Context) {
                     payload = decoded
                 )
             }
-        } catch (e: Exception) {
-            GitHubSyncResult.Error("Sync failed: ${e.localizedMessage ?: "Check internet connection"}")
+        } catch (t: Throwable) {
+            GitHubSyncResult.Error("Sync failed: ${t.localizedMessage ?: "Check internet connection"}")
         }
     }
 

@@ -3,8 +3,11 @@ package com.example.ads
 import android.app.Activity
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,12 +26,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,6 +74,17 @@ object AdManager {
     val CODE_INTERSTITIAL_AD_UNIT_ID: String = BuildConfig.ADMOB_INTERSTITIAL_ID.ifBlank { GOOGLE_TEST_INTERSTITIAL_ID }
     val CODE_REWARDED_AD_UNIT_ID: String = BuildConfig.ADMOB_REWARDED_ID.ifBlank { GOOGLE_TEST_REWARDED_ID }
 
+    private val mainHandler: Handler by lazy { Handler(Looper.getMainLooper()) }
+
+    private fun sanitizeUnitId(candidate: String, fallback: String): String {
+        val trimmed = candidate.trim()
+        return if (trimmed.startsWith("ca-app-pub-") && trimmed.contains("/")) {
+            trimmed
+        } else {
+            fallback
+        }
+    }
+
     data class AdConfigurationState(
         val adsEnabled: Boolean = true,
         val useTestAds: Boolean = true,
@@ -80,13 +98,25 @@ object AdManager {
         val lastAdStatusMessage: String = "Google Mobile Ads Ready"
     ) {
         val activeBannerId: String
-            get() = if (useTestAds) GOOGLE_TEST_BANNER_ID else bannerAdUnitId.trim().ifBlank { GOOGLE_TEST_BANNER_ID }
+            get() = if (useTestAds) {
+                GOOGLE_TEST_BANNER_ID
+            } else {
+                sanitizeUnitId(bannerAdUnitId, GOOGLE_TEST_BANNER_ID)
+            }
 
         val activeInterstitialId: String
-            get() = if (useTestAds) GOOGLE_TEST_INTERSTITIAL_ID else interstitialAdUnitId.trim().ifBlank { GOOGLE_TEST_INTERSTITIAL_ID }
+            get() = if (useTestAds) {
+                GOOGLE_TEST_INTERSTITIAL_ID
+            } else {
+                sanitizeUnitId(interstitialAdUnitId, GOOGLE_TEST_INTERSTITIAL_ID)
+            }
 
         val activeRewardedId: String
-            get() = if (useTestAds) GOOGLE_TEST_REWARDED_ID else rewardedAdUnitId.trim().ifBlank { GOOGLE_TEST_REWARDED_ID }
+            get() = if (useTestAds) {
+                GOOGLE_TEST_REWARDED_ID
+            } else {
+                sanitizeUnitId(rewardedAdUnitId, GOOGLE_TEST_REWARDED_ID)
+            }
     }
 
     private val _state = MutableStateFlow(AdConfigurationState())
@@ -96,6 +126,26 @@ object AdManager {
     private var interstitialAd: InterstitialAd? = null
     private var isLoadingRewarded = false
     private var isLoadingInterstitial = false
+    @Volatile
+    private var isSdkInitStarted = false
+
+    private fun runOnMainThreadSafe(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            try {
+                block()
+            } catch (t: Throwable) {
+                Log.w(TAG, "AdManager main-thread action error: ${t.message}")
+            }
+        } else {
+            mainHandler.post {
+                try {
+                    block()
+                } catch (t: Throwable) {
+                    Log.w(TAG, "AdManager posted main-thread action error: ${t.message}")
+                }
+            }
+        }
+    }
 
     fun isGoogleTestUnitId(adUnitId: String): Boolean {
         return adUnitId.trim().startsWith(GOOGLE_TEST_PUBLISHER_PREFIX) || adUnitId.isBlank()
@@ -111,6 +161,7 @@ object AdManager {
         val hardware = Build.HARDWARE.lowercase()
         return fp.startsWith("generic") ||
             fp.startsWith("unknown") ||
+            fp.contains("robolectric") ||
             model.contains("google_sdk") ||
             model.contains("emulator") ||
             model.contains("android sdk built for") ||
@@ -130,97 +181,113 @@ object AdManager {
     }
 
     fun initialize(context: Context) {
-        val appContext = context.applicationContext
-        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            val appContext = context.applicationContext
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        val adsEnabled = prefs.getBoolean("ads_enabled", true)
+            val adsEnabled = prefs.getBoolean("ads_enabled", true)
 
-        val codeHasLiveIds = !isGoogleTestUnitId(CODE_REWARDED_AD_UNIT_ID) ||
-            !isGoogleTestUnitId(CODE_BANNER_AD_UNIT_ID) ||
-            !isGoogleTestUnitId(CODE_INTERSTITIAL_AD_UNIT_ID)
+            val codeHasLiveIds = !isGoogleTestUnitId(CODE_REWARDED_AD_UNIT_ID) ||
+                !isGoogleTestUnitId(CODE_BANNER_AD_UNIT_ID) ||
+                !isGoogleTestUnitId(CODE_INTERSTITIAL_AD_UNIT_ID)
 
-        val savedBanner = prefs.getString("banner_id", null)
-        val savedInterstitial = prefs.getString("interstitial_id", null)
-        val savedRewarded = prefs.getString("rewarded_id", null)
-        val savedAppId = prefs.getString("app_id", null)
+            val savedBanner = prefs.getString("banner_id", null)
+            val savedInterstitial = prefs.getString("interstitial_id", null)
+            val savedRewarded = prefs.getString("rewarded_id", null)
+            val savedAppId = prefs.getString("app_id", null)
 
-        val effectiveBanner = if (!isGoogleTestUnitId(CODE_BANNER_AD_UNIT_ID)) {
-            CODE_BANNER_AD_UNIT_ID
-        } else {
-            savedBanner ?: CODE_BANNER_AD_UNIT_ID
-        }
-
-        val effectiveInterstitial = if (!isGoogleTestUnitId(CODE_INTERSTITIAL_AD_UNIT_ID)) {
-            CODE_INTERSTITIAL_AD_UNIT_ID
-        } else {
-            savedInterstitial ?: CODE_INTERSTITIAL_AD_UNIT_ID
-        }
-
-        val effectiveRewarded = if (!isGoogleTestUnitId(CODE_REWARDED_AD_UNIT_ID)) {
-            CODE_REWARDED_AD_UNIT_ID
-        } else {
-            savedRewarded ?: CODE_REWARDED_AD_UNIT_ID
-        }
-
-        val anyLiveIdConfigured = !isGoogleTestUnitId(effectiveRewarded) ||
-            !isGoogleTestUnitId(effectiveBanner) ||
-            !isGoogleTestUnitId(effectiveInterstitial)
-
-        val useTestAds = if (prefs.contains("use_test_ads")) {
-            prefs.getBoolean("use_test_ads", !anyLiveIdConfigured)
-        } else if (codeHasLiveIds) {
-            false
-        } else {
-            !anyLiveIdConfigured
-        }
-
-        _state.value = _state.value.copy(
-            adsEnabled = adsEnabled,
-            useTestAds = useTestAds,
-            appId = savedAppId ?: CODE_APP_ID,
-            bannerAdUnitId = effectiveBanner,
-            interstitialAdUnitId = effectiveInterstitial,
-            rewardedAdUnitId = effectiveRewarded,
-            lastAdStatusMessage = when {
-                !adsEnabled -> "Google Ads Disabled (OFF)"
-                useTestAds -> "Google Test Ads Active"
-                else -> "Live AdMob Ads Active"
+            val effectiveBanner = if (!savedBanner.isNullOrBlank()) {
+                savedBanner
+            } else {
+                CODE_BANNER_AD_UNIT_ID
             }
-        )
 
-        if (!adsEnabled) {
-            rewardedAd = null
-            interstitialAd = null
-            return
-        }
+            val effectiveInterstitial = if (!savedInterstitial.isNullOrBlank()) {
+                savedInterstitial
+            } else {
+                CODE_INTERSTITIAL_AD_UNIT_ID
+            }
 
-        if (shouldUseGoogleMobileAdsSdk()) {
-            initializeSdkAndPreload(appContext)
-        } else {
+            val effectiveRewarded = if (!savedRewarded.isNullOrBlank()) {
+                savedRewarded
+            } else {
+                CODE_REWARDED_AD_UNIT_ID
+            }
+
+            val anyLiveIdConfigured = !isGoogleTestUnitId(effectiveRewarded) ||
+                !isGoogleTestUnitId(effectiveBanner) ||
+                !isGoogleTestUnitId(effectiveInterstitial)
+
+            val useTestAds = if (prefs.contains("use_test_ads")) {
+                prefs.getBoolean("use_test_ads", !anyLiveIdConfigured)
+            } else if (codeHasLiveIds) {
+                false
+            } else {
+                !anyLiveIdConfigured
+            }
+
             _state.value = _state.value.copy(
-                isSdkInitialized = true,
-                isRewardedLoaded = true,
-                isInterstitialLoaded = true
+                adsEnabled = adsEnabled,
+                useTestAds = useTestAds,
+                appId = savedAppId ?: CODE_APP_ID,
+                bannerAdUnitId = effectiveBanner,
+                interstitialAdUnitId = effectiveInterstitial,
+                rewardedAdUnitId = effectiveRewarded,
+                lastAdStatusMessage = when {
+                    !adsEnabled -> "Google Ads Disabled (OFF)"
+                    useTestAds -> "Google Test Ads Active"
+                    else -> "Live AdMob Ads Active"
+                }
             )
+
+            if (!adsEnabled) {
+                rewardedAd = null
+                interstitialAd = null
+                return
+            }
+
+            if (shouldUseGoogleMobileAdsSdk()) {
+                initializeSdkAndPreload(appContext)
+            } else {
+                _state.value = _state.value.copy(
+                    isSdkInitialized = true,
+                    isRewardedLoaded = true,
+                    isInterstitialLoaded = true
+                )
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "AdManager initialize warning: ${t.message}")
         }
     }
 
     private fun initializeSdkAndPreload(appContext: Context) {
-        try {
-            MobileAds.initialize(appContext) {
-                _state.value = _state.value.copy(
-                    isSdkInitialized = true,
-                    lastAdStatusMessage = if (_state.value.useTestAds) {
-                        "Google Test Ads Ready"
-                    } else {
-                        "Live AdMob Production Mode"
-                    }
-                )
+        runOnMainThreadSafe {
+            if (_state.value.isSdkInitialized) {
                 preloadRewardedAd(appContext)
                 preloadInterstitialAd(appContext)
+                return@runOnMainThreadSafe
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "MobileAds initialization warning: ${e.message}")
+            if (isSdkInitStarted) return@runOnMainThreadSafe
+            isSdkInitStarted = true
+            try {
+                MobileAds.initialize(appContext) {
+                    runOnMainThreadSafe {
+                        _state.value = _state.value.copy(
+                            isSdkInitialized = true,
+                            lastAdStatusMessage = if (_state.value.useTestAds) {
+                                "Google Test Ads Ready"
+                            } else {
+                                "Live AdMob Production Mode"
+                            }
+                        )
+                        preloadRewardedAd(appContext)
+                        preloadInterstitialAd(appContext)
+                    }
+                }
+            } catch (t: Throwable) {
+                isSdkInitStarted = false
+                Log.w(TAG, "MobileAds initialization warning: ${t.message}")
+            }
         }
     }
 
@@ -234,130 +301,172 @@ object AdManager {
         rewardedId: String = _state.value.rewardedAdUnitId,
         configTimestamp: Long = System.currentTimeMillis()
     ) {
-        val cleanBanner = bannerId.trim().ifBlank { GOOGLE_TEST_BANNER_ID }
-        val cleanInterstitial = interstitialId.trim().ifBlank { GOOGLE_TEST_INTERSTITIAL_ID }
-        val cleanRewarded = rewardedId.trim().ifBlank { GOOGLE_TEST_REWARDED_ID }
+        val cleanBanner = sanitizeUnitId(bannerId, GOOGLE_TEST_BANNER_ID)
+        val cleanInterstitial = sanitizeUnitId(interstitialId, GOOGLE_TEST_INTERSTITIAL_ID)
+        val cleanRewarded = sanitizeUnitId(rewardedId, GOOGLE_TEST_REWARDED_ID)
         val cleanAppId = appId.trim().ifBlank { GOOGLE_TEST_APP_ID }
 
-        context.applicationContext
-            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("ads_enabled", adsEnabled)
-            .putBoolean("use_test_ads", useTestAds)
-            .putString("app_id", cleanAppId)
-            .putString("banner_id", cleanBanner)
-            .putString("interstitial_id", cleanInterstitial)
-            .putString("rewarded_id", cleanRewarded)
-            .putLong("ad_config_updated_at", configTimestamp)
-            .apply()
+        try {
+            context.applicationContext
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("ads_enabled", adsEnabled)
+                .putBoolean("use_test_ads", useTestAds)
+                .putString("app_id", cleanAppId)
+                .putString("banner_id", cleanBanner)
+                .putString("interstitial_id", cleanInterstitial)
+                .putString("rewarded_id", cleanRewarded)
+                .putLong("ad_config_updated_at", configTimestamp)
+                .apply()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed saving ad prefs: ${t.message}")
+        }
 
-        rewardedAd = null
-        interstitialAd = null
-        isLoadingRewarded = false
-        isLoadingInterstitial = false
+        runOnMainThreadSafe {
+            val previousActiveBanner = _state.value.activeBannerId
+            val previousActiveInterstitial = _state.value.activeInterstitialId
+            val previousActiveRewarded = _state.value.activeRewardedId
 
-        _state.value = _state.value.copy(
-            adsEnabled = adsEnabled,
-            useTestAds = useTestAds,
-            appId = cleanAppId,
-            bannerAdUnitId = cleanBanner,
-            interstitialAdUnitId = cleanInterstitial,
-            rewardedAdUnitId = cleanRewarded,
-            isRewardedLoaded = adsEnabled && isRunningOnEmulator(),
-            isInterstitialLoaded = adsEnabled && isRunningOnEmulator(),
-            lastAdStatusMessage = when {
-                !adsEnabled -> "Google Ads Disabled (OFF)"
-                useTestAds -> "Google Test Ads Active"
-                else -> "Live AdMob IDs Active (Test Ads OFF)"
+            _state.value = _state.value.copy(
+                adsEnabled = adsEnabled,
+                useTestAds = useTestAds,
+                appId = cleanAppId,
+                bannerAdUnitId = cleanBanner,
+                interstitialAdUnitId = cleanInterstitial,
+                rewardedAdUnitId = cleanRewarded,
+                isRewardedLoaded = if (!adsEnabled) false else if (isRunningOnEmulator()) true else _state.value.isRewardedLoaded,
+                isInterstitialLoaded = if (!adsEnabled) false else if (isRunningOnEmulator()) true else _state.value.isInterstitialLoaded,
+                lastAdStatusMessage = when {
+                    !adsEnabled -> "Google Ads Disabled (OFF)"
+                    useTestAds -> "Google Test Ads Active"
+                    else -> "Live AdMob IDs Active (Test Ads OFF)"
+                }
+            )
+
+            if (!adsEnabled) {
+                rewardedAd = null
+                interstitialAd = null
+                isLoadingRewarded = false
+                isLoadingInterstitial = false
+                return@runOnMainThreadSafe
             }
-        )
 
-        if (adsEnabled && shouldUseGoogleMobileAdsSdk()) {
-            initializeSdkAndPreload(context.applicationContext)
+            if (_state.value.activeRewardedId != previousActiveRewarded) {
+                rewardedAd = null
+                isLoadingRewarded = false
+            }
+            if (_state.value.activeInterstitialId != previousActiveInterstitial) {
+                interstitialAd = null
+                isLoadingInterstitial = false
+            }
+
+            if (shouldUseGoogleMobileAdsSdk()) {
+                initializeSdkAndPreload(context.applicationContext)
+            }
         }
     }
 
     fun applyRemoteConfigIfPresent(context: Context, remote: RemoteAdConfig?) {
         if (remote == null) return
-        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val localUpdated = prefs.getLong("ad_config_updated_at", 0L)
-        val hasLocalOverride = localUpdated > 0L || prefs.contains("ads_enabled") || prefs.contains("use_test_ads")
-        // Do not let an un-timestamped or older remote GitHub config overwrite local Admin panel switches!
-        if (hasLocalOverride && (remote.updatedAt <= 0L || remote.updatedAt <= localUpdated)) {
-            return
+        try {
+            val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val localUpdated = prefs.getLong("ad_config_updated_at", 0L)
+            val hasLocalOverride = localUpdated > 0L || prefs.contains("ads_enabled") || prefs.contains("use_test_ads")
+            // Do not let an un-timestamped or older remote GitHub config overwrite local Admin panel switches!
+            if (hasLocalOverride && (remote.updatedAt <= 0L || remote.updatedAt <= localUpdated)) {
+                return
+            }
+            updateAdConfig(
+                context = context,
+                adsEnabled = remote.adsEnabled,
+                useTestAds = remote.useTestAds,
+                appId = remote.appId,
+                bannerId = remote.bannerAdUnitId,
+                interstitialId = remote.interstitialAdUnitId,
+                rewardedId = remote.rewardedAdUnitId,
+                configTimestamp = if (remote.updatedAt > 0L) remote.updatedAt else System.currentTimeMillis()
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "applyRemoteConfigIfPresent warning: ${t.message}")
         }
-        updateAdConfig(
-            context = context,
-            adsEnabled = remote.adsEnabled,
-            useTestAds = remote.useTestAds,
-            appId = remote.appId,
-            bannerId = remote.bannerAdUnitId,
-            interstitialId = remote.interstitialAdUnitId,
-            rewardedId = remote.rewardedAdUnitId,
-            configTimestamp = if (remote.updatedAt > 0L) remote.updatedAt else System.currentTimeMillis()
-        )
     }
 
     fun preloadRewardedAd(context: Context) {
         if (!shouldUseGoogleMobileAdsSdk()) return
-        if (isLoadingRewarded || rewardedAd != null) return
-        val unitId = _state.value.activeRewardedId
-        if (unitId.isBlank()) return
+        runOnMainThreadSafe {
+            if (!shouldUseGoogleMobileAdsSdk()) return@runOnMainThreadSafe
+            if (isLoadingRewarded || rewardedAd != null) return@runOnMainThreadSafe
+            val unitId = _state.value.activeRewardedId
+            if (unitId.isBlank()) return@runOnMainThreadSafe
 
-        isLoadingRewarded = true
-        val adRequest = AdRequest.Builder().build()
-        RewardedAd.load(
-            context.applicationContext,
-            unitId,
-            adRequest,
-            object : RewardedAdLoadCallback() {
-                override fun onAdLoaded(ad: RewardedAd) {
-                    rewardedAd = ad
-                    isLoadingRewarded = false
-                    _state.value = _state.value.copy(
-                        isRewardedLoaded = true,
-                        lastAdStatusMessage = "Rewarded Ad Ready"
-                    )
-                }
+            isLoadingRewarded = true
+            try {
+                val adRequest = AdRequest.Builder().build()
+                RewardedAd.load(
+                    context.applicationContext,
+                    unitId,
+                    adRequest,
+                    object : RewardedAdLoadCallback() {
+                        override fun onAdLoaded(ad: RewardedAd) {
+                            rewardedAd = ad
+                            isLoadingRewarded = false
+                            _state.value = _state.value.copy(
+                                isRewardedLoaded = true,
+                                lastAdStatusMessage = "Rewarded Ad Ready"
+                            )
+                        }
 
-                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    rewardedAd = null
-                    isLoadingRewarded = false
-                    _state.value = _state.value.copy(
-                        isRewardedLoaded = false,
-                        lastAdStatusMessage = "Rewarded Load: ${loadAdError.message}"
-                    )
-                }
+                        override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                            rewardedAd = null
+                            isLoadingRewarded = false
+                            _state.value = _state.value.copy(
+                                isRewardedLoaded = false,
+                                lastAdStatusMessage = "Rewarded Load: ${loadAdError.message}"
+                            )
+                        }
+                    }
+                )
+            } catch (t: Throwable) {
+                isLoadingRewarded = false
+                Log.w(TAG, "preloadRewardedAd warning: ${t.message}")
             }
-        )
+        }
     }
 
     fun preloadInterstitialAd(context: Context) {
         if (!shouldUseGoogleMobileAdsSdk()) return
-        if (isLoadingInterstitial || interstitialAd != null) return
-        val unitId = _state.value.activeInterstitialId
-        if (unitId.isBlank()) return
+        runOnMainThreadSafe {
+            if (!shouldUseGoogleMobileAdsSdk()) return@runOnMainThreadSafe
+            if (isLoadingInterstitial || interstitialAd != null) return@runOnMainThreadSafe
+            val unitId = _state.value.activeInterstitialId
+            if (unitId.isBlank()) return@runOnMainThreadSafe
 
-        isLoadingInterstitial = true
-        val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(
-            context.applicationContext,
-            unitId,
-            adRequest,
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: InterstitialAd) {
-                    interstitialAd = ad
-                    isLoadingInterstitial = false
-                    _state.value = _state.value.copy(isInterstitialLoaded = true)
-                }
+            isLoadingInterstitial = true
+            try {
+                val adRequest = AdRequest.Builder().build()
+                InterstitialAd.load(
+                    context.applicationContext,
+                    unitId,
+                    adRequest,
+                    object : InterstitialAdLoadCallback() {
+                        override fun onAdLoaded(ad: InterstitialAd) {
+                            interstitialAd = ad
+                            isLoadingInterstitial = false
+                            _state.value = _state.value.copy(isInterstitialLoaded = true)
+                        }
 
-                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    interstitialAd = null
-                    isLoadingInterstitial = false
-                    _state.value = _state.value.copy(isInterstitialLoaded = false)
-                }
+                        override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                            interstitialAd = null
+                            isLoadingInterstitial = false
+                            _state.value = _state.value.copy(isInterstitialLoaded = false)
+                        }
+                    }
+                )
+            } catch (t: Throwable) {
+                isLoadingInterstitial = false
+                Log.w(TAG, "preloadInterstitialAd warning: ${t.message}")
             }
-        )
+        }
     }
 
     /**
@@ -374,74 +483,20 @@ object AdManager {
             return
         }
 
-        if (isRunningOnEmulator() || activity == null) {
+        if (isRunningOnEmulator() || activity == null || activity.isFinishing) {
             onUnlocked()
             return
         }
 
-        val currentRewarded = rewardedAd
-        if (currentRewarded != null) {
-            var earned = false
-            currentRewarded.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    rewardedAd = null
-                    _state.value = _state.value.copy(isRewardedLoaded = false)
-                    preloadRewardedAd(context)
-                    if (earned) {
-                        onUnlocked()
-                    }
-                }
-
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    rewardedAd = null
-                    _state.value = _state.value.copy(isRewardedLoaded = false)
-                    preloadRewardedAd(context)
-                    onUnlocked()
-                }
-            }
-            currentRewarded.show(activity) {
-                earned = true
-            }
-            return
-        }
-
-        // If RewardedAd is still loading, show preloaded InterstitialAd immediately if ready
-        val currentInterstitial = interstitialAd
-        if (currentInterstitial != null) {
-            currentInterstitial.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    interstitialAd = null
-                    _state.value = _state.value.copy(isInterstitialLoaded = false)
-                    preloadInterstitialAd(context)
-                    preloadRewardedAd(context)
-                    onUnlocked()
-                }
-
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    interstitialAd = null
-                    _state.value = _state.value.copy(isInterstitialLoaded = false)
-                    preloadInterstitialAd(context)
-                    onUnlocked()
-                }
-            }
-            currentInterstitial.show(activity)
-            return
-        }
-
-        // Load and immediately display the Google RewardedAd full-screen activity (no intermediate popup dialog)
-        Toast.makeText(context, "Loading Google Ad...", Toast.LENGTH_SHORT).show()
-        val unitId = _state.value.activeRewardedId
-        val adRequest = AdRequest.Builder().build()
-        RewardedAd.load(
-            context.applicationContext,
-            unitId,
-            adRequest,
-            object : RewardedAdLoadCallback() {
-                override fun onAdLoaded(ad: RewardedAd) {
+        runOnMainThreadSafe {
+            val currentRewarded = rewardedAd
+            if (currentRewarded != null) {
+                try {
                     var earned = false
-                    ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                    currentRewarded.fullScreenContentCallback = object : FullScreenContentCallback() {
                         override fun onAdDismissedFullScreenContent() {
                             rewardedAd = null
+                            _state.value = _state.value.copy(isRewardedLoaded = false)
                             preloadRewardedAd(context)
                             if (earned) {
                                 onUnlocked()
@@ -450,22 +505,102 @@ object AdManager {
 
                         override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                             rewardedAd = null
+                            _state.value = _state.value.copy(isRewardedLoaded = false)
                             preloadRewardedAd(context)
                             onUnlocked()
                         }
                     }
-                    ad.show(activity) {
+                    currentRewarded.show(activity) {
                         earned = true
                     }
-                }
-
-                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                    return@runOnMainThreadSafe
+                } catch (t: Throwable) {
                     rewardedAd = null
-                    preloadRewardedAd(context)
                     onUnlocked()
+                    return@runOnMainThreadSafe
                 }
             }
-        )
+
+            // If RewardedAd is still loading, show preloaded InterstitialAd immediately if ready
+            val currentInterstitial = interstitialAd
+            if (currentInterstitial != null) {
+                try {
+                    currentInterstitial.fullScreenContentCallback = object : FullScreenContentCallback() {
+                        override fun onAdDismissedFullScreenContent() {
+                            interstitialAd = null
+                            _state.value = _state.value.copy(isInterstitialLoaded = false)
+                            preloadInterstitialAd(context)
+                            preloadRewardedAd(context)
+                            onUnlocked()
+                        }
+
+                        override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                            interstitialAd = null
+                            _state.value = _state.value.copy(isInterstitialLoaded = false)
+                            preloadInterstitialAd(context)
+                            onUnlocked()
+                        }
+                    }
+                    currentInterstitial.show(activity)
+                    return@runOnMainThreadSafe
+                } catch (t: Throwable) {
+                    interstitialAd = null
+                    onUnlocked()
+                    return@runOnMainThreadSafe
+                }
+            }
+
+            // Load and immediately display the Google RewardedAd full-screen activity (no intermediate popup dialog)
+            try {
+                Toast.makeText(context, "Loading Google Ad...", Toast.LENGTH_SHORT).show()
+                val unitId = _state.value.activeRewardedId
+                val adRequest = AdRequest.Builder().build()
+                RewardedAd.load(
+                    context.applicationContext,
+                    unitId,
+                    adRequest,
+                    object : RewardedAdLoadCallback() {
+                        override fun onAdLoaded(ad: RewardedAd) {
+                            try {
+                                var earned = false
+                                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                                    override fun onAdDismissedFullScreenContent() {
+                                        rewardedAd = null
+                                        preloadRewardedAd(context)
+                                        if (earned) {
+                                            onUnlocked()
+                                        }
+                                    }
+
+                                    override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                                        rewardedAd = null
+                                        preloadRewardedAd(context)
+                                        onUnlocked()
+                                    }
+                                }
+                                if (!activity.isFinishing) {
+                                    ad.show(activity) {
+                                        earned = true
+                                    }
+                                } else {
+                                    onUnlocked()
+                                }
+                            } catch (t: Throwable) {
+                                onUnlocked()
+                            }
+                        }
+
+                        override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                            rewardedAd = null
+                            preloadRewardedAd(context)
+                            onUnlocked()
+                        }
+                    }
+                )
+            } catch (t: Throwable) {
+                onUnlocked()
+            }
+        }
     }
 
     fun showInterstitialIfLoaded(activity: Activity?, context: Context, onComplete: () -> Unit) {
@@ -474,27 +609,35 @@ object AdManager {
             return
         }
 
-        val current = interstitialAd
-        if (current != null && activity != null) {
-            current.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    interstitialAd = null
-                    _state.value = _state.value.copy(isInterstitialLoaded = false)
-                    preloadInterstitialAd(context)
-                    onComplete()
-                }
+        runOnMainThreadSafe {
+            val current = interstitialAd
+            if (current != null && activity != null && !activity.isFinishing) {
+                try {
+                    current.fullScreenContentCallback = object : FullScreenContentCallback() {
+                        override fun onAdDismissedFullScreenContent() {
+                            interstitialAd = null
+                            _state.value = _state.value.copy(isInterstitialLoaded = false)
+                            preloadInterstitialAd(context)
+                            onComplete()
+                        }
 
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                        override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                            interstitialAd = null
+                            _state.value = _state.value.copy(isInterstitialLoaded = false)
+                            preloadInterstitialAd(context)
+                            onComplete()
+                        }
+                    }
+                    current.show(activity)
+                } catch (t: Throwable) {
                     interstitialAd = null
-                    _state.value = _state.value.copy(isInterstitialLoaded = false)
                     preloadInterstitialAd(context)
                     onComplete()
                 }
+            } else {
+                preloadInterstitialAd(context)
+                onComplete()
             }
-            current.show(activity)
-        } else {
-            preloadInterstitialAd(context)
-            onComplete()
         }
     }
 }
@@ -506,8 +649,9 @@ fun AdMobBannerBar(
     val adState by AdManager.state.collectAsState()
     if (!adState.adsEnabled) return
 
-    val useSdkBanner = !AdManager.isRunningOnEmulator()
+    val useSdkBanner = !AdManager.isRunningOnEmulator() && adState.isSdkInitialized
     val activeBannerUnitId = adState.activeBannerId
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -517,27 +661,50 @@ fun AdMobBannerBar(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (useSdkBanner) {
-            AndroidView(
-                modifier = Modifier.fillMaxWidth(),
-                factory = { ctx ->
-                    AdView(ctx).apply {
+            // Key by activeBannerUnitId so a new AdView is cleanly created if the unit ID changes,
+            // preventing BaseAdView.setAdUnitId IllegalStateException ("The ad unit ID can only be set once on AdView").
+            key(activeBannerUnitId) {
+                val bannerHolder = remember(activeBannerUnitId) {
+                    var createdAdView: AdView? = null
+                    val container = FrameLayout(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT
                         )
-                        setAdSize(AdSize.BANNER)
-                        adUnitId = activeBannerUnitId
-                        adListener = object : AdListener() {}
-                        loadAd(AdRequest.Builder().build())
                     }
-                },
-                update = { adView ->
-                    if (adView.adUnitId != activeBannerUnitId) {
-                        adView.adUnitId = activeBannerUnitId
+                    try {
+                        val adView = AdView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT
+                            )
+                            setAdSize(AdSize.BANNER)
+                            adUnitId = activeBannerUnitId
+                            adListener = object : AdListener() {}
+                        }
+                        container.addView(adView)
                         adView.loadAd(AdRequest.Builder().build())
+                        createdAdView = adView
+                    } catch (t: Throwable) {
+                        Log.w("ShamiAdManager", "Banner AdView creation/load skipped: ${t.message}")
+                    }
+                    Pair(container, createdAdView)
+                }
+
+                DisposableEffect(bannerHolder) {
+                    onDispose {
+                        try {
+                            bannerHolder.second?.destroy()
+                        } catch (_: Throwable) {
+                        }
                     }
                 }
-            )
+
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth(),
+                    factory = { bannerHolder.first }
+                )
+            }
         } else {
             Row(
                 modifier = Modifier

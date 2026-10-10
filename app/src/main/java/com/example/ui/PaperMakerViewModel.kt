@@ -22,14 +22,16 @@ import com.example.data.SavedPaperPayload
 import com.example.data.SeedData
 import com.example.data.SubjectEntity
 import com.example.pdf.ExamPdfGenerator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
-
+import android.util.Log
 import android.app.Activity
 
 enum class BottomNavTab {
@@ -130,23 +132,48 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
 
     init {
         AdManager.initialize(application)
-        seedDatabaseIfNeeded()
-        autoSyncFromGitHubIfConfigured()
+        startupInitializeDatabaseAndSync()
     }
 
-    private fun seedDatabaseIfNeeded() {
-        viewModelScope.launch {
-            val existingSubjects = dao.getAllSubjectsOnce()
-            if (existingSubjects.isEmpty()) {
-                val subjects = SeedData.defaultSubjects()
-                val chapters = SeedData.defaultChapters(subjects)
-                val questions = SeedData.defaultQuestions(chapters, subjects)
-                dao.insertSubjects(subjects)
-                dao.insertChapters(chapters)
-                dao.insertQuestions(questions)
-            } else {
-                normalizeAllExistingQuestionsInDatabase()
+    private fun startupInitializeDatabaseAndSync() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val existingSubjects = dao.getAllSubjectsOnce()
+                if (existingSubjects.isEmpty()) {
+                    val subjects = SeedData.defaultSubjects()
+                    val chapters = SeedData.defaultChapters(subjects)
+                    val questions = SeedData.defaultQuestions(chapters, subjects)
+                    dao.insertSubjects(subjects)
+                    dao.insertChapters(chapters)
+                    dao.insertQuestions(questions)
+                } else {
+                    normalizeAllExistingQuestionsInDatabase()
+                }
+            } catch (t: Throwable) {
+                Log.w("PaperMakerVM", "Startup seed/normalize warning: ${t.message}")
             }
+
+            try {
+                val cfg = gitHubService.getConfig()
+                if ((cfg.owner.isNotBlank() && cfg.repo.isNotBlank()) || cfg.customRawUrl.isNotBlank()) {
+                    val res = gitHubService.fetchBankFromGitHub(cfg)
+                    if (res is GitHubSyncResult.Success && res.payload != null) {
+                        applyBankPayloadToDatabase(res.payload)
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.w("PaperMakerVM", "Startup GitHub auto-sync warning: ${t.message}")
+            }
+        }
+    }
+
+    private fun questionGroupNeedsNormalization(group: List<QuestionEntity>): Boolean {
+        return group.any { q ->
+            q.questionEn.isBlank() ||
+                q.questionUr.isBlank() ||
+                q.questionEn.contains("::") ||
+                q.questionUr.contains("::") ||
+                (q.type == QuestionType.MCQ.code && (q.optionAEn.isBlank() || q.optionAUr.isBlank()))
         }
     }
 
@@ -157,25 +184,17 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
         val normalizedAll = mutableListOf<QuestionEntity>()
         var changed = false
         for ((_, group) in grouped) {
-            val norm = BulkQuestionParser.normalizeAndPairChapterQuestions(group)
-            if (norm != group) changed = true
-            normalizedAll.addAll(norm)
+            if (questionGroupNeedsNormalization(group)) {
+                val norm = BulkQuestionParser.normalizeAndPairChapterQuestions(group)
+                if (norm != group) changed = true
+                normalizedAll.addAll(norm)
+            } else {
+                normalizedAll.addAll(group)
+            }
         }
         if (changed) {
             dao.clearAllQuestions()
             dao.insertQuestions(normalizedAll)
-        }
-    }
-
-    private fun autoSyncFromGitHubIfConfigured() {
-        val cfg = gitHubService.getConfig()
-        if ((cfg.owner.isNotBlank() && cfg.repo.isNotBlank()) || cfg.customRawUrl.isNotBlank()) {
-            viewModelScope.launch {
-                val res = gitHubService.fetchBankFromGitHub(cfg)
-                if (res is GitHubSyncResult.Success && res.payload != null) {
-                    applyBankPayloadToDatabase(res.payload)
-                }
-            }
         }
     }
 
@@ -666,90 +685,109 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             _statusMessage.value = "Please paste questions text first."
             return
         }
-        viewModelScope.launch {
-            val parsed = if (type == QuestionType.MCQ) {
-                BulkQuestionParser.parseMcqQuestions(
-                    rawText = rawText,
-                    chapter = chapter
-                )
-            } else {
-                BulkQuestionParser.parseShortOrLongQuestions(
-                    rawText = rawText,
-                    chapter = chapter,
-                    type = type
-                )
-            }
-            if (parsed.isEmpty()) {
-                _statusMessage.value = "Could not parse questions from text."
-                return@launch
-            }
-            if (replaceExisting) {
-                val normalized = BulkQuestionParser.normalizeAndPairChapterQuestions(parsed)
-                val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(normalized)
-                dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
-                dao.insertQuestions(enriched)
-                _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
-            } else {
-                val existingInChapterType = dao.getAllQuestionsOnce()
-                    .filter { it.chapterId == chapter.id && it.type == type.code }
-                val combined = BulkQuestionParser.normalizeAndPairChapterQuestions(existingInChapterType + parsed)
-                val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(combined)
-                dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
-                dao.insertQuestions(enriched)
-                _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val parsed = if (type == QuestionType.MCQ) {
+                    BulkQuestionParser.parseMcqQuestions(
+                        rawText = rawText,
+                        chapter = chapter
+                    )
+                } else {
+                    BulkQuestionParser.parseShortOrLongQuestions(
+                        rawText = rawText,
+                        chapter = chapter,
+                        type = type
+                    )
+                }
+                if (parsed.isEmpty()) {
+                    _statusMessage.value = "Could not parse questions from text."
+                    return@launch
+                }
+                if (replaceExisting) {
+                    val normalized = BulkQuestionParser.normalizeAndPairChapterQuestions(parsed)
+                    val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(normalized)
+                    dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
+                    dao.insertQuestions(enriched)
+                    _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
+                } else {
+                    val existingInChapterType = dao.getAllQuestionsOnce()
+                        .filter { it.chapterId == chapter.id && it.type == type.code }
+                    val combined = BulkQuestionParser.normalizeAndPairChapterQuestions(existingInChapterType + parsed)
+                    val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(combined)
+                    dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
+                    dao.insertQuestions(enriched)
+                    _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
+                }
+            } catch (t: Throwable) {
+                _statusMessage.value = "Error saving questions: ${t.localizedMessage ?: "Unknown error"}"
             }
         }
     }
 
     fun deleteSingleQuestion(questionId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             dao.deleteQuestionById(questionId)
             _statusMessage.value = "Question removed."
         }
     }
 
     fun uploadCurrentDatabaseToGitHub(config: GitHubRepoConfig) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             _isSyncingGitHub.value = true
-            gitHubService.saveConfig(config)
-            val adState = AdManager.state.value
-            val payload = GitHubPaperBankPayload(
-                adConfig = RemoteAdConfig(
-                    adsEnabled = adState.adsEnabled,
-                    useTestAds = adState.useTestAds,
-                    appId = adState.appId,
-                    bannerAdUnitId = adState.bannerAdUnitId,
-                    interstitialAdUnitId = adState.interstitialAdUnitId,
-                    rewardedAdUnitId = adState.rewardedAdUnitId,
-                    updatedAt = System.currentTimeMillis()
-                ),
-                subjects = dao.getAllSubjectsOnce(),
-                chapters = dao.getAllChaptersOnce(),
-                questions = dao.getAllQuestionsOnce()
-            )
-            when (val res = gitHubService.pushBankToGitHub(config, payload)) {
-                is GitHubSyncResult.Success -> _statusMessage.value = res.message
-                is GitHubSyncResult.Error -> _statusMessage.value = res.errorMessage
+            try {
+                gitHubService.saveConfig(config)
+                val adState = AdManager.state.value
+                val payload = GitHubPaperBankPayload(
+                    adConfig = RemoteAdConfig(
+                        adsEnabled = adState.adsEnabled,
+                        useTestAds = adState.useTestAds,
+                        appId = adState.appId,
+                        bannerAdUnitId = adState.bannerAdUnitId,
+                        interstitialAdUnitId = adState.interstitialAdUnitId,
+                        rewardedAdUnitId = adState.rewardedAdUnitId,
+                        updatedAt = System.currentTimeMillis()
+                    ),
+                    subjects = dao.getAllSubjectsOnce(),
+                    chapters = dao.getAllChaptersOnce(),
+                    questions = dao.getAllQuestionsOnce()
+                )
+                when (val res = gitHubService.pushBankToGitHub(config, payload)) {
+                    is GitHubSyncResult.Success -> _statusMessage.value = res.message
+                    is GitHubSyncResult.Error -> _statusMessage.value = res.errorMessage
+                }
+            } catch (t: Throwable) {
+                _statusMessage.value = "GitHub upload error: ${t.localizedMessage ?: "Unknown error"}"
+            } finally {
+                _isSyncingGitHub.value = false
             }
-            _isSyncingGitHub.value = false
         }
     }
 
-    private suspend fun applyBankPayloadToDatabase(payload: GitHubPaperBankPayload) {
-        if (payload.subjects.isNotEmpty()) {
-            dao.clearAllSubjects()
-            dao.insertSubjects(payload.subjects)
+    private suspend fun applyBankPayloadToDatabase(payload: GitHubPaperBankPayload) = withContext(Dispatchers.IO) {
+        try {
+            if (payload.subjects.isNotEmpty()) {
+                dao.clearAllSubjects()
+                dao.insertSubjects(payload.subjects)
+            }
+            if (payload.chapters.isNotEmpty()) {
+                dao.clearAllChapters()
+                dao.insertChapters(payload.chapters)
+            }
+            if (payload.questions.isNotEmpty()) {
+                val grouped = payload.questions.groupBy { "${it.chapterId}::${it.type}" }
+                val normalizedAll = grouped.values.flatMap { group ->
+                    if (questionGroupNeedsNormalization(group)) {
+                        BulkQuestionParser.normalizeAndPairChapterQuestions(group)
+                    } else {
+                        group
+                    }
+                }
+                dao.clearAllQuestions()
+                dao.insertQuestions(normalizedAll)
+            }
+            AdManager.applyRemoteConfigIfPresent(getApplication(), payload.adConfig)
+        } catch (t: Throwable) {
+            Log.w("PaperMakerVM", "applyBankPayloadToDatabase warning: ${t.message}")
         }
-        if (payload.chapters.isNotEmpty()) {
-            dao.clearAllChapters()
-            dao.insertChapters(payload.chapters)
-        }
-        if (payload.questions.isNotEmpty()) {
-            dao.clearAllQuestions()
-            val grouped = payload.questions.groupBy { "${it.chapterId}::${it.type}" }
-            val normalizedAll = grouped.values.flatMap { BulkQuestionParser.normalizeAndPairChapterQuestions(it) }
-            dao.insertQuestions(normalizedAll)
-        }
-        AdManager.applyRemoteConfigIfPresent(getApplication(), payload.adConfig)
     }
 }

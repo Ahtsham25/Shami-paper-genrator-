@@ -29,24 +29,63 @@ object UrduEnglishAutoTranslator {
         RegexOption.IGNORE_CASE
     )
 
+    private val latinLettersRegex = Regex("[A-Za-z]+")
+    private val parensBlockRegex = Regex("\\([^)]*\\)")
+
+    private fun isPunctuationOrWhitespace(ch: Char): Boolean {
+        return ch.isWhitespace() ||
+            ch == '؟' || ch == '?' || ch == '.' || ch == '!' ||
+            ch == '،' || ch == ',' || ch == ':' || ch == ';' ||
+            ch == '-' || ch == '–' || ch == '—' || ch == '/' ||
+            ch == '\\' || ch == '(' || ch == ')' || ch == '[' ||
+            ch == ']' || ch == '"' || ch == '\'' || ch == '۔'
+    }
+
     private fun normalizeKey(text: String): String {
-        return stripLeadingQuestionNumber(text)
-            .replace(Regex("[\\u064B-\\u065F\\u0670\\u06D6-\\u06ED]"), "") // strip Arabic/Urdu diacritics
-            .replace("ۂ", "ہ")
-            .replace("ة", "ۃ")
-            .replace("ي", "ی")
-            .replace("ك", "ک")
-            .replace(Regex("[؟?.!،,:;\\-–—/\\\\()\\[\\]\"']"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        val stripped = stripLeadingQuestionNumber(text)
+        val sb = StringBuilder(stripped.length)
+        var lastWasSpace = true
+        for (rawCh in stripped) {
+            val code = rawCh.code
+            if (code in 0x064B..0x065F || code == 0x0670 || code in 0x06D6..0x06ED) {
+                continue
+            }
+            val ch = when (rawCh) {
+                'ۂ' -> 'ہ'
+                'ة' -> 'ۃ'
+                'ي' -> 'ی'
+                'ك' -> 'ک'
+                else -> rawCh
+            }
+            if (isPunctuationOrWhitespace(ch)) {
+                if (!lastWasSpace) {
+                    sb.append(' ')
+                    lastWasSpace = true
+                }
+            } else {
+                sb.append(ch)
+                lastWasSpace = false
+            }
+        }
+        return sb.toString().trim()
     }
 
     private fun normalizeEnKey(text: String): String {
-        return stripLeadingQuestionNumber(text)
-            .lowercase()
-            .replace(Regex("[؟?.!،,:;\\-–—/\\\\()\\[\\]\"']"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        val stripped = stripLeadingQuestionNumber(text).lowercase()
+        val sb = StringBuilder(stripped.length)
+        var lastWasSpace = true
+        for (ch in stripped) {
+            if (isPunctuationOrWhitespace(ch)) {
+                if (!lastWasSpace) {
+                    sb.append(' ')
+                    lastWasSpace = true
+                }
+            } else {
+                sb.append(ch)
+                lastWasSpace = false
+            }
+        }
+        return sb.toString().trim()
     }
 
     fun stripLeadingQuestionNumber(raw: String): String {
@@ -196,7 +235,7 @@ object UrduEnglishAutoTranslator {
         buildMap {
             for ((k, v) in rawQuestionPairsUrEn) {
                 put(normalizeKey(k), v)
-                val withoutLatin = normalizeKey(k.replace(Regex("[A-Za-z]+"), " "))
+                val withoutLatin = normalizeKey(k.replace(latinLettersRegex, " "))
                 if (withoutLatin.isNotBlank()) {
                     put(withoutLatin, v)
                 }
@@ -212,7 +251,7 @@ object UrduEnglishAutoTranslator {
                 if (normEn.isNotBlank() && !containsKey(normEn)) {
                     put(normEn, cleanUr)
                 }
-                val withoutParens = normalizeEnKey(en.replace(Regex("\\([^)]*\\)"), " "))
+                val withoutParens = normalizeEnKey(en.replace(parensBlockRegex, " "))
                 if (withoutParens.isNotBlank() && !containsKey(withoutParens)) {
                     put(withoutParens, cleanUr)
                 }
@@ -325,7 +364,7 @@ object UrduEnglishAutoTranslator {
                 if (normEn.isNotBlank() && !containsKey(normEn)) {
                     put(normEn, ur)
                 }
-                val withoutParens = normalizeEnKey(en.replace(Regex("\\([^)]*\\)"), " "))
+                val withoutParens = normalizeEnKey(en.replace(parensBlockRegex, " "))
                 if (withoutParens.isNotBlank() && !containsKey(withoutParens)) {
                     put(withoutParens, ur)
                 }
@@ -1255,7 +1294,9 @@ object UrduEnglishAutoTranslator {
             "has", "have", "had", "that", "this", "these", "those", "it", "its"
         )
 
-        val tokens = working.trim().split(Regex("[\\s,;:?.!()\\[\\]\"']+")).filter { it.isNotBlank() }
+        val tokens = working.trim()
+            .split(' ', '\t', '\n', '\r', ',', ';', ':', '?', '.', '!', '(', ')', '[', ']', '"', '\'')
+            .filter { it.isNotBlank() }
         val outTokens = mutableListOf<String>()
 
         for (tok in tokens) {
