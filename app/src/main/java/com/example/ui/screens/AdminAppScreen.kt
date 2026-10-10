@@ -38,6 +38,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -67,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -695,15 +697,15 @@ private fun AdminQuestionsBulkTab(
                         label = {
                             Text(
                                 if (selectedType == QuestionType.MCQ) {
-                                    "Paste MCQs (English, Urdu, or Both Mixed)"
+                                    "Paste MCQs (Urdu Only, English Only, or Both -> Auto-Translates)"
                                 } else {
-                                    "Paste ${selectedType.titleEn} (English, Urdu, or Both Mixed)"
+                                    "Paste ${selectedType.titleEn} (Urdu Only, English Only, or Both -> Auto-Translates)"
                                 }
                             )
                         },
                         supportingText = {
                             Text(
-                                text = "Paste English & Urdu together (same line, next line, or separate blocks) — they will be automatically separated for English Medium, Urdu Medium, and Bilingual!",
+                                text = "آپ صرف اردو میڈیم پیسٹ کریں تو انگلش آٹو بن جائے گی، اور اگر صرف انگلش میڈیم پیسٹ کریں تو اردو میڈیم آٹو بن جائے گا! بائی لینگویج میں دونوں خود بخود شو ہوں گے۔",
                                 fontSize = 11.sp,
                                 color = Color(0xFF0D9488)
                             )
@@ -744,7 +746,7 @@ private fun AdminQuestionsBulkTab(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0B2447)),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Save Questions", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Save & Auto-Translate", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         Button(
@@ -790,11 +792,12 @@ private fun AdminQuestionsBulkTab(
                         if (urText.isNotBlank() && urText != enText) {
                             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                 Text(
-                                    text = "${idx + 1}. $urText",
+                                    text = "\u200F${idx + 1}۔ $urText",
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp,
                                     color = Color(0xFF0D9488),
                                     textAlign = TextAlign.Right,
+                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }

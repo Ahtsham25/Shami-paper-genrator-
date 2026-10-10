@@ -42,6 +42,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -72,6 +73,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -637,8 +639,9 @@ private fun QuestionChecklistTab(
                                 }
                                 PaperLanguage.URDU -> {
                                     Text(
-                                        text = cleanUr.ifBlank { q.questionUr },
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        text = "\u200F${cleanUr.ifBlank { q.questionUr }}",
+                                        style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Rtl),
+                                        textAlign = TextAlign.Right,
                                         fontWeight = FontWeight.SemiBold,
                                         modifier = Modifier.fillMaxWidth()
                                     )
@@ -655,8 +658,9 @@ private fun QuestionChecklistTab(
                                     if (cleanUr.isNotBlank()) {
                                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                             Text(
-                                                text = cleanUr,
-                                                style = MaterialTheme.typography.bodyMedium,
+                                                text = "\u200F$cleanUr",
+                                                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Rtl),
+                                                textAlign = TextAlign.Right,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = Color(0xFF0F766E),
                                                 modifier = Modifier.fillMaxWidth()
@@ -672,7 +676,7 @@ private fun QuestionChecklistTab(
                                     PaperLanguage.ENGLISH ->
                                         "(A) $optAEn   (B) $optBEn   (C) $optCEn   (D) $optDEn"
                                     PaperLanguage.URDU ->
-                                        "(الف) $optAUr   (ب) $optBUr   (ج) $optCUr   (د) $optDUr"
+                                        "\u200F(الف) $optAUr   (ب) $optBUr   (ج) $optCUr   (د) $optDUr"
                                     PaperLanguage.BILINGUAL ->
                                         "(A) $optAEn/$optAUr  (B) $optBEn/$optBUr  (C) $optCEn/$optCUr  (D) $optDEn/$optDUr"
                                 }
@@ -680,6 +684,10 @@ private fun QuestionChecklistTab(
                                     text = optionsLine,
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = if (language == PaperLanguage.URDU) TextAlign.Right else TextAlign.Start,
+                                    style = LocalTextStyle.current.copy(
+                                        textDirection = if (language == PaperLanguage.URDU) TextDirection.Rtl else TextDirection.Ltr
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -934,9 +942,11 @@ private fun DraggableSelectedQuestionRow(
                     PaperLanguage.URDU -> {
                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                             Text(
-                                text = "${index + 1}۔ ${cleanUr.ifBlank { question.questionUr }}",
+                                text = "\u200F${index + 1}۔ ${cleanUr.ifBlank { question.questionUr }}",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Right,
+                                style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
                                 maxLines = 2,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -954,9 +964,11 @@ private fun DraggableSelectedQuestionRow(
                         if (cleanUr.isNotBlank()) {
                             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                 Text(
-                                    text = "${index + 1}۔ $cleanUr",
+                                    text = "\u200F${index + 1}۔ $cleanUr",
                                     fontSize = 12.sp,
                                     color = Color(0xFF0D9488),
+                                    textAlign = TextAlign.Right,
+                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
                                     maxLines = 2,
                                     modifier = Modifier.fillMaxWidth()
                                 )

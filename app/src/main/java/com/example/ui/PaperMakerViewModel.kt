@@ -685,16 +685,18 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             }
             if (replaceExisting) {
                 val normalized = BulkQuestionParser.normalizeAndPairChapterQuestions(parsed)
+                val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(normalized)
                 dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
-                dao.insertQuestions(normalized)
-                _statusMessage.value = "Updated ${normalized.size} ${type.titleEn} in ${chapter.titleEn}!"
+                dao.insertQuestions(enriched)
+                _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
             } else {
                 val existingInChapterType = dao.getAllQuestionsOnce()
                     .filter { it.chapterId == chapter.id && it.type == type.code }
                 val combined = BulkQuestionParser.normalizeAndPairChapterQuestions(existingInChapterType + parsed)
+                val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(combined)
                 dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
-                dao.insertQuestions(combined)
-                _statusMessage.value = "Updated ${combined.size} ${type.titleEn} in ${chapter.titleEn}!"
+                dao.insertQuestions(enriched)
+                _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
             }
         }
     }

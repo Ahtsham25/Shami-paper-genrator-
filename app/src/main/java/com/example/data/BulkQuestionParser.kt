@@ -9,7 +9,7 @@ object BulkQuestionParser {
     private val latinWordRegex = Regex("[A-Za-z]{2,}")
 
     private val leadingNumberRegex = Regex(
-        "^\\s*(?:[•*\\-–—]+\\s*)?(?:Q(?:uestion)?\\.?\\s*#?\\s*\\d+[:.)\\-]?|سوال\\s*نمبر\\s*[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[:.)\\-۔]?|سوال\\s*[\\d\\u06F0-\\u06F9\\u0660-\\u0669]*[:.)\\-۔]?|\\([\\d\\u06F0-\\u06F9\\u0660-\\u0669]+\\)|\\[[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+\\]|[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[.):\\-۔]|\\([ivxIVX]+\\)|[ivxIVX]+[.):])\\s*",
+        "^\\s*(?:[•*\\-–—]+\\s*)?(?:Q(?:uestion)?[\\s\\-–—.#]*\\d+[:.)\\-]*|سوال\\s*(?:نمبر)?[\\s\\-–—.:]*[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[:.)\\-۔]*|س[\\s\\-–—.:]+[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[:.)\\-۔]*|سوال\\s*[:.)\\-۔]+|\\([\\d\\u06F0-\\u06F9\\u0660-\\u0669]+\\)|\\[[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+\\]|[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[.):\\-۔]|\\([ivxIVX]+\\)|[ivxIVX]+[.):])\\s*",
         RegexOption.IGNORE_CASE
     )
 
@@ -19,7 +19,7 @@ object BulkQuestionParser {
     )
 
     private val trailingOrphanNumberBeforeUrduRegex = Regex(
-        "\\s*(?:Q(?:uestion)?\\.?\\s*#?\\s*\\d+[:.)\\-]?|\\(?[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[.):\\-]?|\\([ivxIVX]+\\)|\\([A-Da-d]\\)|[/:|\\-–—]|\\()\\s*$",
+        "\\s*(?:Q(?:uestion)?\\.?\\s*#?\\s*\\d+[:.)\\-]?|سوال\\s*(?:نمبر)?[\\s\\-–—.:]*[\\d\\u06F0-\\u06F9\\u0660-\\u0669]*[:.)\\-۔]?|س[\\s\\-–—.:]+[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[:.)\\-۔]?|\\(?[\\d\\u06F0-\\u06F9\\u0660-\\u0669]+[.):\\-]?|\\([ivxIVX]+\\)|\\([A-Da-d]\\)|[/:|\\-–—]|\\()\\s*$",
         RegexOption.IGNORE_CASE
     )
 
@@ -41,13 +41,29 @@ object BulkQuestionParser {
     )
 
     private val trailingInlineAnswerRegex = Regex(
-        "\\s*(?:\\[?\\s*(?:Ans(?:wer)?|Correct|جواب)\\s*[:=\\-]\\s*([A-Da-d]|الف|ا|ب|ج|د)\\s*\\]?|\\(\\s*(?:Ans|جواب)\\s*[:=\\-]?\\s*([A-Da-d]|الف|ا|ب|ج|د)\\s*\\))\\s*$",
+        "\\s*(?:\\[?\\s*(?:Ans(?:wer)?|Correct|جواب)\\s*[:=\\-]\\s*([A-Da-d]|الف|ا|ب|ج|د)\\s*\\]?|\\(\\s*(?:Ans|جواب)\\s*[:=\\-]?\\s*([A-Da-d]|الف|ا|ب|ج|د)\\s*\\)|\\|\\s*([A-Da-d]|الف|ا|ب|ج|د))\\s*$",
         RegexOption.IGNORE_CASE
+    )
+
+    private val urduEnglishGlossRegex = Regex(
+        "([\\u0600-\\u06FF\\u0750-\\u077F\\uFB50-\\uFDFF\\uFE70-\\uFEFF]+)\\s*\\(\\s*[A-Za-z][A-Za-z0-9\\s\\-/.,']*\\)"
     )
 
     fun containsUrdu(text: String): Boolean = urduRegex.containsMatchIn(text)
 
     fun containsEnglish(text: String): Boolean = anyLatinRegex.containsMatchIn(text)
+
+    /**
+     * Strips redundant parenthetical English glosses from Urdu text (e.g. "گیسوں کے تبادلے (Gaseous exchange)" -> "گیسوں کے تبادلے")
+     * so Urdu Medium papers show pure Urdu without mixed English words.
+     */
+    fun stripEnglishGlossFromUrdu(urduText: String): String {
+        if (!containsUrdu(urduText)) return urduText.trim()
+        return urduText
+            .replace(urduEnglishGlossRegex, "$1")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
 
     fun cleanLeadingNumber(line: String): String {
         var current = line.trim()
@@ -109,16 +125,16 @@ object BulkQuestionParser {
      * - If the string has both English and Urdu (via ::, |, /, -, or adjacent on the same line),
      *   returns Pair(cleanEnglish, cleanUrdu).
      * - If the string is pure English, returns Pair(cleanEnglish, "").
-     * - If the string is pure Urdu (even with inline chemical/physics symbols like pH or SI),
+     * - If the string is pure Urdu (even with inline chemical/physics/biology terms like pH, SI, C,
+     *   or parenthetical glosses like "(Gaseous exchange)" or "(microvilli)"),
      *   returns Pair("", cleanUrdu).
      */
     fun splitBilingualText(raw: String, isOption: Boolean = false): Pair<String, String> {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) return "" to ""
-
         val cleanFn: (String) -> String = { s ->
             if (isOption) cleanOptionPrefix(s) else cleanLeadingNumber(s)
         }
+        val trimmed = cleanFn(raw.trim())
+        if (trimmed.isBlank()) return "" to ""
 
         // 1. Check explicit delimiters (::, |, Tab)
         val explicitSep = when {
@@ -133,14 +149,14 @@ object BulkQuestionParser {
             val urParts = parts.filter { containsUrdu(it) }
             if (enParts.isNotEmpty() && urParts.isNotEmpty()) {
                 val en = cleanFn(enParts.joinToString(" "))
-                val ur = cleanFn(urParts.joinToString(" "))
+                val ur = stripEnglishGlossFromUrdu(cleanFn(urParts.joinToString(" ")))
                 return en to ur
             }
             if (urParts.isEmpty() && enParts.isNotEmpty()) {
                 return cleanFn(enParts.first()) to ""
             }
             if (enParts.isEmpty() && urParts.isNotEmpty()) {
-                return "" to cleanFn(urParts.first())
+                return "" to stripEnglishGlossFromUrdu(cleanFn(urParts.first()))
             }
         }
 
@@ -166,9 +182,9 @@ object BulkQuestionParser {
                     val p0Ur = containsUrdu(parts[0])
                     val p1Ur = containsUrdu(parts[1])
                     if (!p0Ur && p1Ur && containsEnglish(parts[0])) {
-                        return cleanFn(parts[0]) to cleanFn(parts[1])
+                        return cleanFn(parts[0]) to stripEnglishGlossFromUrdu(cleanFn(parts[1]))
                     } else if (p0Ur && !p1Ur && containsEnglish(parts[1])) {
-                        return cleanFn(parts[1]) to cleanFn(parts[0])
+                        return cleanFn(parts[1]) to stripEnglishGlossFromUrdu(cleanFn(parts[0]))
                     }
                 }
             }
@@ -195,36 +211,36 @@ object BulkQuestionParser {
         val afterHasEn = containsEnglish(rawAfterLastUrdu)
 
         if (isOption) {
-            if (beforeHasEn && !afterHasEn) {
+            if (beforeHasEn && !afterHasEn && !rawBeforeUrdu.startsWith("(") && !rawFromFirstUrdu.startsWith("(")) {
                 val en = cleanOptionPrefix(rawBeforeUrdu)
-                val ur = cleanOptionPrefix(rawFromFirstUrdu)
+                val ur = stripEnglishGlossFromUrdu(cleanOptionPrefix(rawFromFirstUrdu))
                 if (en.isNotBlank() && ur.isNotBlank()) return en to ur
             }
-            if (afterHasEn && !beforeHasEn) {
-                val ur = cleanOptionPrefix(rawUpToLastUrdu)
+            if (afterHasEn && !beforeHasEn && !rawAfterLastUrdu.startsWith("(")) {
+                val ur = stripEnglishGlossFromUrdu(cleanOptionPrefix(rawUpToLastUrdu))
                 val en = cleanOptionPrefix(rawAfterLastUrdu)
                 if (en.isNotBlank() && ur.isNotBlank()) return en to ur
             }
         } else {
-            // Question stem: ensure English part is an actual English phrase/question
-            // and not a single technical token (like "pH") at the start of an Urdu sentence.
+            // Question stem: ensure English part is an actual full English question/sentence
+            // and NOT an inline technical term or parenthetical gloss inside an Urdu sentence.
             if (beforeHasEn && !afterHasEn) {
                 val candidateEn = cleanLeadingNumber(rawBeforeUrdu)
                 val wordCount = latinWordRegex.findAll(candidateEn).count()
                 val endsWithPunct = candidateEn.lastOrNull() in listOf('?', '.', '!', ':', ';')
-                if (wordCount >= 2 || (wordCount >= 1 && endsWithPunct)) {
-                    val candidateUr = cleanLeadingNumber(rawFromFirstUrdu)
+                if (wordCount >= 3 || (wordCount >= 2 && endsWithPunct)) {
+                    val candidateUr = stripEnglishGlossFromUrdu(cleanLeadingNumber(rawFromFirstUrdu))
                     if (candidateEn.isNotBlank() && candidateUr.isNotBlank()) {
                         return candidateEn to candidateUr
                     }
                 }
             }
-            if (afterHasEn && !beforeHasEn) {
+            if (afterHasEn && !beforeHasEn && !rawAfterLastUrdu.startsWith("(") && !rawAfterLastUrdu.endsWith(")")) {
                 val candidateEn = cleanLeadingNumber(rawAfterLastUrdu)
                 val wordCount = latinWordRegex.findAll(candidateEn).count()
                 val endsWithPunct = candidateEn.lastOrNull() in listOf('?', '.', '!', ':', ';')
-                if (wordCount >= 2 || (wordCount >= 1 && endsWithPunct)) {
-                    val candidateUr = cleanLeadingNumber(rawUpToLastUrdu)
+                if (wordCount >= 3 || (wordCount >= 2 && endsWithPunct)) {
+                    val candidateUr = stripEnglishGlossFromUrdu(cleanLeadingNumber(rawUpToLastUrdu))
                     if (candidateEn.isNotBlank() && candidateUr.isNotBlank()) {
                         return candidateEn to candidateUr
                     }
@@ -232,9 +248,15 @@ object BulkQuestionParser {
             }
         }
 
-        // Fallback: if mostly Urdu with an inline English symbol (e.g. "قوت کا SI یونٹ کیا ہے؟"),
-        // treat as Urdu question.
-        return "" to cleanFn(trimmed)
+        // If mostly English (e.g. an English question referencing an Urdu literary title in quotes/parens),
+        // treat as English; otherwise treat as Urdu question with inline English term (e.g. "(Gaseous exchange)", "HCl", "SI").
+        val urduCharCount = allUrduMatches.size
+        val latinCharCount = anyLatinRegex.findAll(trimmed).count()
+        return if (latinCharCount > urduCharCount * 2) {
+            cleanFn(trimmed.replace(urduRegex, "").replace(Regex("\\s+"), " ").trim()) to ""
+        } else {
+            "" to stripEnglishGlossFromUrdu(cleanFn(trimmed))
+        }
     }
 
     /**
@@ -300,14 +322,24 @@ object BulkQuestionParser {
 
         var order = startOrder
         return pairedQuestions.map { (qEn, qUr) ->
+            val finalEn = qEn.ifBlank {
+                if (qUr.isNotBlank()) {
+                    UrduEnglishAutoTranslator.translateUrduToEnglishOffline(qUr, isOption = false)
+                } else ""
+            }
+            val finalUr = qUr.ifBlank {
+                if (qEn.isNotBlank()) {
+                    UrduEnglishAutoTranslator.translateEnglishToUrduOffline(qEn, isOption = false)
+                } else ""
+            }
             QuestionEntity(
                 id = "${chapter.id}_${type.code.lowercase()}_${UUID.randomUUID().toString().take(8)}",
                 chapterId = chapter.id,
                 subjectId = chapter.subjectId,
                 classLevel = chapter.classLevel,
                 type = type.code,
-                questionEn = qEn,
-                questionUr = qUr,
+                questionEn = finalEn,
+                questionUr = finalUr,
                 marks = marksPerQuestion,
                 sortOrder = order++
             )
@@ -359,7 +391,9 @@ object BulkQuestionParser {
         var detectedAns: String? = null
         val ansMatch = trailingInlineAnswerRegex.find(workingLine)
         if (ansMatch != null) {
-            val rawAns = ansMatch.groupValues[1].ifBlank { ansMatch.groupValues[2] }
+            val rawAns = ansMatch.groupValues[1]
+                .ifBlank { ansMatch.groupValues[2] }
+                .ifBlank { ansMatch.groupValues[3] }
             detectedAns = parseAnswerLetter(rawAns)
             workingLine = workingLine.substring(0, ansMatch.range.first).trim()
         }
@@ -574,7 +608,6 @@ object BulkQuestionParser {
                 aUr = cleanOptionPrefix(rawOptsUr!!.getOrElse(0) { aEn })
                 bUr = cleanOptionPrefix(rawOptsUr!!.getOrElse(1) { bEn })
                 cUr = cleanOptionPrefix(rawOptsUr!!.getOrElse(2) { cEn })
-                cUr = cleanOptionPrefix(rawOptsUr!!.getOrElse(2) { cEn })
                 dUr = cleanOptionPrefix(rawOptsUr!!.getOrElse(3) { dEn })
             } else {
                 val singleList = rawOptsEnOrMixed ?: rawOptsUr ?: listOf("Option A", "Option B", "Option C", "Option D")
@@ -621,7 +654,7 @@ object BulkQuestionParser {
 
     /**
      * Pairs pure-English MCQ drafts and pure-Urdu MCQ drafts (whether alternating or in two blocks)
-     * into unified Bilingual QuestionEntity objects.
+     * into unified Bilingual QuestionEntity objects, and auto-translates Urdu-only MCQs into English.
      */
     private fun finalizeMcqDrafts(
         drafts: List<McqDraft>,
@@ -678,22 +711,52 @@ object BulkQuestionParser {
 
         var order = startOrder
         return merged.map { d ->
+            val finalQEn = d.qEn.ifBlank {
+                if (d.qUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(d.qUr, isOption = false) else ""
+            }
+            val finalQUr = d.qUr.ifBlank {
+                if (d.qEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(d.qEn, isOption = false) else ""
+            }
+            val finalAEn = d.aEn.ifBlank {
+                if (d.aUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(d.aUr, isOption = true) else ""
+            }
+            val finalBEn = d.bEn.ifBlank {
+                if (d.bUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(d.bUr, isOption = true) else ""
+            }
+            val finalCEn = d.cEn.ifBlank {
+                if (d.cUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(d.cUr, isOption = true) else ""
+            }
+            val finalDEn = d.dEn.ifBlank {
+                if (d.dUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(d.dUr, isOption = true) else ""
+            }
+            val finalAUr = d.aUr.ifBlank {
+                if (d.aEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(d.aEn, isOption = true) else ""
+            }
+            val finalBUr = d.bUr.ifBlank {
+                if (d.bEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(d.bEn, isOption = true) else ""
+            }
+            val finalCUr = d.cUr.ifBlank {
+                if (d.cEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(d.cEn, isOption = true) else ""
+            }
+            val finalDUr = d.dUr.ifBlank {
+                if (d.dEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(d.dEn, isOption = true) else ""
+            }
             QuestionEntity(
                 id = "${chapter.id}_mcq_${UUID.randomUUID().toString().take(8)}",
                 chapterId = chapter.id,
                 subjectId = chapter.subjectId,
                 classLevel = chapter.classLevel,
                 type = QuestionType.MCQ.code,
-                questionEn = d.qEn,
-                questionUr = d.qUr,
-                optionAEn = d.aEn,
-                optionBEn = d.bEn,
-                optionCEn = d.cEn,
-                optionDEn = d.dEn,
-                optionAUr = d.aUr,
-                optionBUr = d.bUr,
-                optionCUr = d.cUr,
-                optionDUr = d.dUr,
+                questionEn = finalQEn,
+                questionUr = finalQUr,
+                optionAEn = finalAEn,
+                optionBEn = finalBEn,
+                optionCEn = finalCEn,
+                optionDEn = finalDEn,
+                optionAUr = finalAUr,
+                optionBUr = finalBUr,
+                optionCUr = finalCUr,
+                optionDUr = finalDUr,
                 correctOption = d.correct,
                 marks = marksPerMcq,
                 sortOrder = order++
@@ -705,30 +768,62 @@ object BulkQuestionParser {
      * Normalizes & pairs a list of existing QuestionEntity items in a chapter+type:
      * 1) Splits any question that had English & Urdu mixed in the same field.
      * 2) Pairs pure-English and pure-Urdu questions in the same chapter+type into unified Bilingual items.
+     * 3) Auto-generates English Medium for any Urdu-only questions AND Urdu Medium for any English-only questions.
      */
     fun normalizeAndPairChapterQuestions(questions: List<QuestionEntity>): List<QuestionEntity> {
         if (questions.isEmpty()) return emptyList()
 
+        fun rawEn(q: QuestionEntity): String {
+            val (en1, _) = splitBilingualText(q.questionEn, isOption = false)
+            if (en1.isNotBlank()) return en1
+            val (en2, _) = splitBilingualText(q.questionUr, isOption = false)
+            return en2
+        }
+
+        fun rawUr(q: QuestionEntity): String {
+            val (_, ur1) = splitBilingualText(q.questionUr, isOption = false)
+            if (ur1.isNotBlank()) return ur1
+            val (_, ur2) = splitBilingualText(q.questionEn, isOption = false)
+            return ur2
+        }
+
+        fun rawOptEn(optEn: String, optUr: String): String {
+            val (en1, _) = splitBilingualText(optEn, isOption = true)
+            if (en1.isNotBlank()) return en1
+            val (en2, _) = splitBilingualText(optUr, isOption = true)
+            if (en2.isNotBlank()) return en2
+            val fallback = optEn.ifBlank { optUr }.trim()
+            return if (!containsUrdu(fallback)) fallback else ""
+        }
+
+        fun rawOptUr(optEn: String, optUr: String): String {
+            val (_, ur1) = splitBilingualText(optUr, isOption = true)
+            if (ur1.isNotBlank()) return ur1
+            val (_, ur2) = splitBilingualText(optEn, isOption = true)
+            if (ur2.isNotBlank()) return ur2
+            return ""
+        }
+
         val cleaned = questions.sortedBy { it.sortOrder }.map { q ->
-            val enResolved = q.resolvedQuestionEn()
-            val urResolved = q.resolvedQuestionUr()
+            val enPart = rawEn(q)
+            val urPart = rawUr(q)
             if (q.type == QuestionType.MCQ.code) {
                 q.copy(
-                    questionEn = enResolved,
-                    questionUr = urResolved,
-                    optionAEn = q.resolvedOptionAEn(),
-                    optionBEn = q.resolvedOptionBEn(),
-                    optionCEn = q.resolvedOptionCEn(),
-                    optionDEn = q.resolvedOptionDEn(),
-                    optionAUr = q.resolvedOptionAUr(),
-                    optionBUr = q.resolvedOptionBUr(),
-                    optionCUr = q.resolvedOptionCUr(),
-                    optionDUr = q.resolvedOptionDUr()
+                    questionEn = enPart,
+                    questionUr = urPart,
+                    optionAEn = rawOptEn(q.optionAEn, q.optionAUr),
+                    optionBEn = rawOptEn(q.optionBEn, q.optionBUr),
+                    optionCEn = rawOptEn(q.optionCEn, q.optionCUr),
+                    optionDEn = rawOptEn(q.optionDEn, q.optionDUr),
+                    optionAUr = rawOptUr(q.optionAEn, q.optionAUr),
+                    optionBUr = rawOptUr(q.optionBEn, q.optionBUr),
+                    optionCUr = rawOptUr(q.optionCEn, q.optionCUr),
+                    optionDUr = rawOptUr(q.optionDEn, q.optionDUr)
                 )
             } else {
                 q.copy(
-                    questionEn = enResolved,
-                    questionUr = urResolved
+                    questionEn = enPart,
+                    questionUr = urPart
                 )
             }
         }
@@ -736,36 +831,94 @@ object BulkQuestionParser {
         val pureEn = cleaned.filter { it.questionEn.isNotBlank() && it.questionUr.isBlank() }
         val pureUr = cleaned.filter { it.questionUr.isNotBlank() && it.questionEn.isBlank() }
 
-        // If there are both pure-English and pure-Urdu questions in the same chapter & type, pair them!
-        if (pureEn.isEmpty() || pureUr.isEmpty()) {
-            return cleaned
+        val pairedList = if (pureEn.isNotEmpty() && pureUr.isNotEmpty()) {
+            val bilingual = cleaned.filter { it.questionEn.isNotBlank() && it.questionUr.isNotBlank() }
+            val paired = mutableListOf<QuestionEntity>()
+            paired.addAll(bilingual)
+
+            val maxPairs = maxOf(pureEn.size, pureUr.size)
+            for (i in 0 until maxPairs) {
+                val enQ = pureEn.getOrNull(i)
+                val urQ = pureUr.getOrNull(i)
+                when {
+                    enQ != null && urQ != null -> {
+                        paired.add(
+                            enQ.copy(
+                                questionUr = urQ.questionUr,
+                                optionAUr = urQ.optionAUr.ifBlank { enQ.optionAEn },
+                                optionBUr = urQ.optionBUr.ifBlank { enQ.optionBEn },
+                                optionCUr = urQ.optionCUr.ifBlank { enQ.optionCEn },
+                                optionDUr = urQ.optionDUr.ifBlank { enQ.optionDEn }
+                            )
+                        )
+                    }
+                    enQ != null -> paired.add(enQ)
+                    urQ != null -> paired.add(urQ)
+                }
+            }
+            paired
+        } else {
+            cleaned
         }
 
-        val bilingual = cleaned.filter { it.questionEn.isNotBlank() && it.questionUr.isNotBlank() }
-        val paired = mutableListOf<QuestionEntity>()
-        paired.addAll(bilingual)
-
-        val maxPairs = maxOf(pureEn.size, pureUr.size)
-        for (i in 0 until maxPairs) {
-            val enQ = pureEn.getOrNull(i)
-            val urQ = pureUr.getOrNull(i)
-            when {
-                enQ != null && urQ != null -> {
-                    paired.add(
-                        enQ.copy(
-                            questionUr = urQ.questionUr,
-                            optionAUr = urQ.optionAUr.ifBlank { enQ.optionAEn },
-                            optionBUr = urQ.optionBUr.ifBlank { enQ.optionBEn },
-                            optionCUr = urQ.optionCUr.ifBlank { enQ.optionCEn },
-                            optionDUr = urQ.optionDUr.ifBlank { enQ.optionDEn }
-                        )
-                    )
+        // Now ensure any question that has Urdu but no English gets auto-translated into English,
+        // and any question that has English but no Urdu gets auto-translated into Urdu!
+        return pairedList.mapIndexed { idx, q ->
+            val autoQEn = q.questionEn.ifBlank {
+                if (q.questionUr.isNotBlank()) {
+                    UrduEnglishAutoTranslator.translateUrduToEnglishOffline(q.questionUr, isOption = false)
+                } else ""
+            }
+            val autoQUr = q.questionUr.ifBlank {
+                if (q.questionEn.isNotBlank()) {
+                    UrduEnglishAutoTranslator.translateEnglishToUrduOffline(q.questionEn, isOption = false)
+                } else ""
+            }
+            if (q.type == QuestionType.MCQ.code) {
+                val aEn = q.optionAEn.ifBlank {
+                    if (q.optionAUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(q.optionAUr, isOption = true) else ""
                 }
-                enQ != null -> paired.add(enQ)
-                urQ != null -> paired.add(urQ)
+                val bEn = q.optionBEn.ifBlank {
+                    if (q.optionBUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(q.optionBUr, isOption = true) else ""
+                }
+                val cEn = q.optionCEn.ifBlank {
+                    if (q.optionCUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(q.optionCUr, isOption = true) else ""
+                }
+                val dEn = q.optionDEn.ifBlank {
+                    if (q.optionDUr.isNotBlank()) UrduEnglishAutoTranslator.translateUrduToEnglishOffline(q.optionDUr, isOption = true) else ""
+                }
+                val aUr = q.optionAUr.ifBlank {
+                    if (aEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(aEn, isOption = true) else ""
+                }
+                val bUr = q.optionBUr.ifBlank {
+                    if (bEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(bEn, isOption = true) else ""
+                }
+                val cUr = q.optionCUr.ifBlank {
+                    if (cEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(cEn, isOption = true) else ""
+                }
+                val dUr = q.optionDUr.ifBlank {
+                    if (dEn.isNotBlank()) UrduEnglishAutoTranslator.translateEnglishToUrduOffline(dEn, isOption = true) else ""
+                }
+                q.copy(
+                    questionEn = autoQEn,
+                    questionUr = autoQUr,
+                    optionAEn = aEn,
+                    optionBEn = bEn,
+                    optionCEn = cEn,
+                    optionDEn = dEn,
+                    optionAUr = aUr,
+                    optionBUr = bUr,
+                    optionCUr = cUr,
+                    optionDUr = dUr,
+                    sortOrder = idx + 1
+                )
+            } else {
+                q.copy(
+                    questionEn = autoQEn,
+                    questionUr = autoQUr,
+                    sortOrder = idx + 1
+                )
             }
         }
-
-        return paired.mapIndexed { idx, q -> q.copy(sortOrder = idx + 1) }
     }
 }

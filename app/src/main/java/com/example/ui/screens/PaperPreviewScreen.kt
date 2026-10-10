@@ -51,6 +51,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -80,6 +81,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -963,19 +965,23 @@ fun PaperPreviewWorkspaceContent(
                                     when (lang) {
                                         PaperLanguage.ENGLISH -> {
                                             Text(
-                                                text = "${idx + 1}. ${cleanEn.ifBlank { q.questionEn }}",
+                                                text = "${idx + 1}. $cleanEn",
                                                 color = Color(0xFF0F172A),
                                                 fontSize = (13f * fontScaleMultiplier).sp,
                                                 fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Left,
+                                                style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                         }
                                         PaperLanguage.URDU -> {
                                             Text(
-                                                text = "${idx + 1}۔ ${cleanUr.ifBlank { q.questionUr }}",
+                                                text = "\u200F${idx + 1}۔ ${cleanUr.ifBlank { q.questionUr }}",
                                                 color = Color(0xFF0F172A),
                                                 fontSize = (13f * fontScaleMultiplier).sp,
                                                 fontWeight = FontWeight.Bold,
+                                                textAlign = TextAlign.Right,
+                                                style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                         }
@@ -986,16 +992,20 @@ fun PaperPreviewWorkspaceContent(
                                                     color = Color(0xFF0F172A),
                                                     fontSize = (13f * fontScaleMultiplier).sp,
                                                     fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Left,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
                                                     modifier = Modifier.fillMaxWidth()
                                                 )
                                             }
                                             if (cleanUr.isNotBlank()) {
                                                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                                                     Text(
-                                                        text = "${idx + 1}۔ $cleanUr",
+                                                        text = "\u200F${idx + 1}۔ $cleanUr",
                                                         color = Color(0xFF0F172A),
                                                         fontSize = (13f * fontScaleMultiplier).sp,
                                                         fontWeight = FontWeight.Bold,
+                                                        textAlign = TextAlign.Right,
+                                                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
                                                         modifier = Modifier.fillMaxWidth()
                                                     )
                                                 }
@@ -1006,25 +1016,28 @@ fun PaperPreviewWorkspaceContent(
                                     Spacer(modifier = Modifier.height(4.dp))
 
                                     val optA = when (lang) {
-                                        PaperLanguage.ENGLISH -> "(A) ${optAEn.ifBlank { q.optionAEn }}"
-                                        PaperLanguage.URDU -> "(الف) ${optAUr.ifBlank { q.optionAUr }}"
-                                        PaperLanguage.BILINGUAL -> "(A) $optAEn/$optAUr"
+                                        PaperLanguage.ENGLISH -> "(A) $optAEn"
+                                        PaperLanguage.URDU -> "\u200F(الف) ${optAUr.ifBlank { q.optionAUr }}"
+                                        PaperLanguage.BILINGUAL -> "(A) $optAEn / $optAUr"
                                     }
                                     val optB = when (lang) {
-                                        PaperLanguage.ENGLISH -> "(B) ${optBEn.ifBlank { q.optionBEn }}"
-                                        PaperLanguage.URDU -> "(ب) ${optBUr.ifBlank { q.optionBUr }}"
-                                        PaperLanguage.BILINGUAL -> "(B) $optBEn/$optBUr"
+                                        PaperLanguage.ENGLISH -> "(B) $optBEn"
+                                        PaperLanguage.URDU -> "\u200F(ب) ${optBUr.ifBlank { q.optionBUr }}"
+                                        PaperLanguage.BILINGUAL -> "(B) $optBEn / $optBUr"
                                     }
                                     val optC = when (lang) {
-                                        PaperLanguage.ENGLISH -> "(C) ${optCEn.ifBlank { q.optionCEn }}"
-                                        PaperLanguage.URDU -> "(ج) ${optCUr.ifBlank { q.optionCUr }}"
-                                        PaperLanguage.BILINGUAL -> "(C) $optCEn/$optCUr"
+                                        PaperLanguage.ENGLISH -> "(C) $optCEn"
+                                        PaperLanguage.URDU -> "\u200F(ج) ${optCUr.ifBlank { q.optionCUr }}"
+                                        PaperLanguage.BILINGUAL -> "(C) $optCEn / $optCUr"
                                     }
                                     val optD = when (lang) {
-                                        PaperLanguage.ENGLISH -> "(D) ${optDEn.ifBlank { q.optionDEn }}"
-                                        PaperLanguage.URDU -> "(د) ${optDUr.ifBlank { q.optionDUr }}"
-                                        PaperLanguage.BILINGUAL -> "(D) $optDEn/$optDUr"
+                                        PaperLanguage.ENGLISH -> "(D) $optDEn"
+                                        PaperLanguage.URDU -> "\u200F(د) ${optDUr.ifBlank { q.optionDUr }}"
+                                        PaperLanguage.BILINGUAL -> "(D) $optDEn / $optDUr"
                                     }
+
+                                    val optAlign = if (lang == PaperLanguage.URDU) TextAlign.Right else TextAlign.Left
+                                    val optDir = if (lang == PaperLanguage.URDU) TextDirection.Rtl else TextDirection.Ltr
 
                                     if (header.paperVersion == 1) {
                                         Row(
@@ -1035,10 +1048,10 @@ fun PaperPreviewWorkspaceContent(
                                                 .padding(6.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Text(optA, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
-                                            Text(optB, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
-                                            Text(optC, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
-                                            Text(optD, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), modifier = Modifier.weight(1f))
+                                            Text(optA, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), textAlign = optAlign, style = LocalTextStyle.current.copy(textDirection = optDir), modifier = Modifier.weight(1f))
+                                            Text(optB, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), textAlign = optAlign, style = LocalTextStyle.current.copy(textDirection = optDir), modifier = Modifier.weight(1f))
+                                            Text(optC, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), textAlign = optAlign, style = LocalTextStyle.current.copy(textDirection = optDir), modifier = Modifier.weight(1f))
+                                            Text(optD, fontSize = (11f * fontScaleMultiplier).sp, color = Color(0xFF334155), textAlign = optAlign, style = LocalTextStyle.current.copy(textDirection = optDir), modifier = Modifier.weight(1f))
                                         }
                                     } else {
                                         val optText = "$optA    $optB    $optC    $optD"
@@ -1046,6 +1059,8 @@ fun PaperPreviewWorkspaceContent(
                                             text = optText,
                                             color = Color(0xFF334155),
                                             fontSize = (12f * fontScaleMultiplier).sp,
+                                            textAlign = optAlign,
+                                            style = LocalTextStyle.current.copy(textDirection = optDir),
                                             modifier = Modifier.fillMaxWidth()
                                         )
                                         HorizontalDivider(color = Color(0xFFE2E8F0), modifier = Modifier.padding(top = 4.dp))
@@ -1072,61 +1087,15 @@ fun PaperPreviewWorkspaceContent(
                             val cleanEn = q.resolvedQuestionEn()
                             val cleanUr = q.resolvedQuestionUr()
 
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                            ) {
-                                when (lang) {
-                                    PaperLanguage.ENGLISH -> {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.Top
-                                        ) {
-                                            Text(
-                                                text = "(${idx + 1}) ${cleanEn.ifBlank { q.questionEn }}",
-                                                color = Color(0xFF0F172A),
-                                                fontSize = (13f * fontScaleMultiplier).sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "[${q.marks}]",
-                                                color = Color(0xFF0F172A),
-                                                fontSize = (12f * fontScaleMultiplier).sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                    PaperLanguage.URDU -> {
-                                        // True Right-to-Left Short Question: Question on Right, Marks on Left
-                                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.Top
-                                            ) {
-                                                Text(
-                                                    text = "(${idx + 1}) ${cleanUr.ifBlank { q.questionUr }}",
-                                                    color = Color(0xFF0F172A),
-                                                    fontSize = (13f * fontScaleMultiplier).sp,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = "[${q.marks}]",
-                                                    color = Color(0xFF0F172A),
-                                                    fontSize = (12f * fontScaleMultiplier).sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                    PaperLanguage.BILINGUAL -> {
-                                        if (cleanEn.isNotBlank()) {
+                            val itemDir = if (lang == PaperLanguage.URDU) LayoutDirection.Rtl else LayoutDirection.Ltr
+                            CompositionLocalProvider(LocalLayoutDirection provides itemDir) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    when (lang) {
+                                        PaperLanguage.ENGLISH -> {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1137,6 +1106,8 @@ fun PaperPreviewWorkspaceContent(
                                                     color = Color(0xFF0F172A),
                                                     fontSize = (13f * fontScaleMultiplier).sp,
                                                     fontWeight = FontWeight.SemiBold,
+                                                    textAlign = TextAlign.Left,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
                                                     modifier = Modifier.weight(1f)
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
@@ -1148,15 +1119,70 @@ fun PaperPreviewWorkspaceContent(
                                                 )
                                             }
                                         }
-                                        if (cleanUr.isNotBlank()) {
-                                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                        PaperLanguage.URDU -> {
+                                            // True Right-to-Left Short Question: Question on Right (1۔ ...), Marks on Left ([2])
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
                                                 Text(
-                                                    text = "(${idx + 1}) $cleanUr",
+                                                    text = "\u200F${idx + 1}۔ ${cleanUr.ifBlank { q.questionUr }}",
                                                     color = Color(0xFF0F172A),
                                                     fontSize = (13f * fontScaleMultiplier).sp,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    modifier = Modifier.fillMaxWidth()
+                                                    textAlign = TextAlign.Right,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
+                                                    modifier = Modifier.weight(1f)
                                                 )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "\u200F[${q.marks}]",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (12f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Left,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                                                )
+                                            }
+                                        }
+                                        PaperLanguage.BILINGUAL -> {
+                                            if (cleanEn.isNotBlank()) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.Top
+                                                ) {
+                                                    Text(
+                                                        text = "(${idx + 1}) $cleanEn",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (13f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        textAlign = TextAlign.Left,
+                                                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = "[${q.marks}]",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (12f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                            if (cleanUr.isNotBlank()) {
+                                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                                    Text(
+                                                        text = "\u200F${idx + 1}۔ $cleanUr",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (13f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        textAlign = TextAlign.Right,
+                                                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -1181,61 +1207,15 @@ fun PaperPreviewWorkspaceContent(
                             val cleanEn = q.resolvedQuestionEn()
                             val cleanUr = q.resolvedQuestionUr()
 
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 5.dp)
-                            ) {
-                                when (lang) {
-                                    PaperLanguage.ENGLISH -> {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.Top
-                                        ) {
-                                            Text(
-                                                text = "Q.${idx + 1}: ${cleanEn.ifBlank { q.questionEn }}",
-                                                color = Color(0xFF0F172A),
-                                                fontSize = (13f * fontScaleMultiplier).sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "(${q.marks} Marks)",
-                                                color = Color(0xFF0F172A),
-                                                fontSize = (12f * fontScaleMultiplier).sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                    PaperLanguage.URDU -> {
-                                        // True Right-to-Left Long Question: Question on Right, Marks on Left
-                                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.Top
-                                            ) {
-                                                Text(
-                                                    text = "سوال نمبر ${idx + 1}: ${cleanUr.ifBlank { q.questionUr }}",
-                                                    color = Color(0xFF0F172A),
-                                                    fontSize = (13f * fontScaleMultiplier).sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = "(${q.marks} نمبر)",
-                                                    color = Color(0xFF0F172A),
-                                                    fontSize = (12f * fontScaleMultiplier).sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    }
-                                    PaperLanguage.BILINGUAL -> {
-                                        if (cleanEn.isNotBlank()) {
+                            val itemDir = if (lang == PaperLanguage.URDU) LayoutDirection.Rtl else LayoutDirection.Ltr
+                            CompositionLocalProvider(LocalLayoutDirection provides itemDir) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 5.dp)
+                                ) {
+                                    when (lang) {
+                                        PaperLanguage.ENGLISH -> {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1246,6 +1226,8 @@ fun PaperPreviewWorkspaceContent(
                                                     color = Color(0xFF0F172A),
                                                     fontSize = (13f * fontScaleMultiplier).sp,
                                                     fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Left,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
                                                     modifier = Modifier.weight(1f)
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
@@ -1257,15 +1239,70 @@ fun PaperPreviewWorkspaceContent(
                                                 )
                                             }
                                         }
-                                        if (cleanUr.isNotBlank()) {
-                                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                        PaperLanguage.URDU -> {
+                                            // True Right-to-Left Long Question: Question on Right, Marks on Left
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
                                                 Text(
-                                                    text = "سوال نمبر ${idx + 1}: $cleanUr   (${q.marks} نمبر)",
+                                                    text = "\u200Fسوال نمبر ${idx + 1}: ${cleanUr.ifBlank { q.questionUr }}",
                                                     color = Color(0xFF0F172A),
                                                     fontSize = (13f * fontScaleMultiplier).sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.fillMaxWidth()
+                                                    textAlign = TextAlign.Right,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
+                                                    modifier = Modifier.weight(1f)
                                                 )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "\u200F(${q.marks} نمبر)",
+                                                    color = Color(0xFF0F172A),
+                                                    fontSize = (12f * fontScaleMultiplier).sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Left,
+                                                    style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl)
+                                                )
+                                            }
+                                        }
+                                        PaperLanguage.BILINGUAL -> {
+                                            if (cleanEn.isNotBlank()) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.Top
+                                                ) {
+                                                    Text(
+                                                        text = "Q.${idx + 1}: $cleanEn",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (13f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        textAlign = TextAlign.Left,
+                                                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = "(${q.marks} Marks)",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (12f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                }
+                                            }
+                                            if (cleanUr.isNotBlank()) {
+                                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                                                    Text(
+                                                        text = "\u200Fسوال نمبر ${idx + 1}: $cleanUr   (${q.marks} نمبر)",
+                                                        color = Color(0xFF0F172A),
+                                                        fontSize = (13f * fontScaleMultiplier).sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        textAlign = TextAlign.Right,
+                                                        style = LocalTextStyle.current.copy(textDirection = TextDirection.Rtl),
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -1959,201 +1996,208 @@ private fun EditableTablePaperHeader(
     totalMarks: Int,
     onUpdateHeader: (PaperHeaderConfig) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.8.dp, Color(0xFF0B2447), RoundedCornerShape(6.dp))
-    ) {
-        // Table Row 1: Editable Institution / Academy Name
-        Box(
+    val isUrdu = header.languageMode.equals(PaperLanguage.URDU.code, ignoreCase = true)
+    val dir = if (isUrdu) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides dir) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFF1F5F9))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
+                .border(1.8.dp, Color(0xFF0B2447), RoundedCornerShape(6.dp))
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth()
+            // Table Row 1: Editable Institution / Academy Name
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF1F5F9))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
-                BasicTextField(
-                    value = header.institutionName,
-                    onValueChange = { onUpdateHeader(header.copy(institutionName = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        color = Color(0xFF0B2447),
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        textAlign = TextAlign.Center
-                    ),
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    BasicTextField(
+                        value = header.institutionName,
+                        onValueChange = { onUpdateHeader(header.copy(institutionName = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color(0xFF0B2447),
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("inline_edit_institution_name")
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editable Institution Name",
+                        tint = Color(0xFF0D9488),
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(thickness = 1.2.dp, color = Color(0xFF0B2447))
+
+            // Table Row 2: Editable Student Name | Editable Roll No
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Row(
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("inline_edit_institution_name")
-                )
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = "Editable Institution Name",
-                    tint = Color(0xFF0D9488),
-                    modifier = Modifier.size(15.dp)
-                )
-            }
-        }
-
-        HorizontalDivider(thickness = 1.2.dp, color = Color(0xFF0B2447))
-
-        // Table Row 2: Editable Student Name | Editable Roll No
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Name: ",
-                    color = Color(0xFF0F172A),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                BasicTextField(
-                    value = header.studentNameValue,
-                    onValueChange = { onUpdateHeader(header.copy(studentNameValue = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isUrdu) "نام طالب علم: " else "Name: ",
                         color = Color(0xFF0F172A),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    decorationBox = { inner ->
-                        if (header.studentNameValue.isEmpty()) {
-                            Text("______________", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                        }
-                        inner()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .width(1.2.dp)
-                    .height(32.dp)
-                    .background(Color(0xFF0B2447))
-            )
-
-            Row(
-                modifier = Modifier
-                    .weight(0.85f)
-                    .padding(horizontal = 8.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Roll No: ",
-                    color = Color(0xFF0F172A),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                BasicTextField(
-                    value = header.rollNumberValue,
-                    onValueChange = { onUpdateHeader(header.copy(rollNumberValue = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        color = Color(0xFF0F172A),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    decorationBox = { inner ->
-                        if (header.rollNumberValue.isEmpty()) {
-                            Text("_________", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                        }
-                        inner()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        HorizontalDivider(thickness = 1.2.dp, color = Color(0xFF0B2447))
-
-        // Table Row 3: Editable Subject | Editable Time Allowed | Auto Total Marks
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFFF8FAFC)),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier
-                    .weight(1.1f)
-                    .padding(horizontal = 8.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Book: ",
-                    color = Color(0xFF0F172A),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                BasicTextField(
-                    value = header.subjectNameEn,
-                    onValueChange = { onUpdateHeader(header.copy(subjectNameEn = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        color = Color(0xFF0D9488),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+                    )
+                    BasicTextField(
+                        value = header.studentNameValue,
+                        onValueChange = { onUpdateHeader(header.copy(studentNameValue = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color(0xFF0F172A),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        decorationBox = { inner ->
+                            if (header.studentNameValue.isEmpty()) {
+                                Text("______________", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            }
+                            inner()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
-            Box(
-                modifier = Modifier
-                    .width(1.2.dp)
-                    .height(32.dp)
-                    .background(Color(0xFF0B2447))
-            )
-
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Time: ",
-                    color = Color(0xFF0F172A),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                Box(
+                    modifier = Modifier
+                        .width(1.2.dp)
+                        .height(32.dp)
+                        .background(Color(0xFF0B2447))
                 )
-                BasicTextField(
-                    value = header.timeAllowed,
-                    onValueChange = { onUpdateHeader(header.copy(timeAllowed = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(
+
+                Row(
+                    modifier = Modifier
+                        .weight(0.85f)
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isUrdu) "رول نمبر: " else "Roll No: ",
                         color = Color(0xFF0F172A),
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                        fontWeight = FontWeight.Bold
+                    )
+                    BasicTextField(
+                        value = header.rollNumberValue,
+                        onValueChange = { onUpdateHeader(header.copy(rollNumberValue = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color(0xFF0F172A),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        decorationBox = { inner ->
+                            if (header.rollNumberValue.isEmpty()) {
+                                Text("_________", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            }
+                            inner()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .width(1.2.dp)
-                    .height(32.dp)
-                    .background(Color(0xFF0B2447))
-            )
+            HorizontalDivider(thickness = 1.2.dp, color = Color(0xFF0B2447))
 
-            Text(
-                text = "Marks: $totalMarks",
-                color = Color(0xFF0B2447),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
-            )
+            // Table Row 3: Editable Subject | Editable Time Allowed | Auto Total Marks
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF8FAFC)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isUrdu) "مضمون: " else "Book: ",
+                        color = Color(0xFF0F172A),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    BasicTextField(
+                        value = if (isUrdu) header.subjectNameUr.ifBlank { header.subjectNameEn } else header.subjectNameEn,
+                        onValueChange = {
+                            if (isUrdu) onUpdateHeader(header.copy(subjectNameUr = it))
+                            else onUpdateHeader(header.copy(subjectNameEn = it))
+                        },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color(0xFF0D9488),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(1.2.dp)
+                        .height(32.dp)
+                        .background(Color(0xFF0B2447))
+                )
+
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isUrdu) "وقت: " else "Time: ",
+                        color = Color(0xFF0F172A),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    BasicTextField(
+                        value = header.timeAllowed,
+                        onValueChange = { onUpdateHeader(header.copy(timeAllowed = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(
+                            color = Color(0xFF0F172A),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(1.2.dp)
+                        .height(32.dp)
+                        .background(Color(0xFF0B2447))
+                )
+
+                Text(
+                    text = if (isUrdu) "کل نمبر: $totalMarks" else "Marks: $totalMarks",
+                    color = Color(0xFF0B2447),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
+                )
+            }
         }
     }
 }
@@ -2167,125 +2211,147 @@ private fun EditableClassicPaperHeader(
     totalMarks: Int,
     onUpdateHeader: (PaperHeaderConfig) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.5.dp, Color(0xFF0B2447), RoundedCornerShape(8.dp))
-            .background(Color(0xFFF8FAFC))
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+    val isUrdu = header.languageMode.equals(PaperLanguage.URDU.code, ignoreCase = true)
+    val dir = if (isUrdu) LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides dir) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.5.dp, Color(0xFF0B2447), RoundedCornerShape(8.dp))
+                .background(Color(0xFFF8FAFC))
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            BasicTextField(
-                value = header.institutionName,
-                onValueChange = { onUpdateHeader(header.copy(institutionName = it)) },
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = Color(0xFF0B2447),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = TextAlign.Center
-                ),
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Editable Institution Name",
-                tint = Color(0xFF0D9488),
-                modifier = Modifier.size(15.dp)
-            )
-        }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                BasicTextField(
+                    value = header.institutionName,
+                    onValueChange = { onUpdateHeader(header.copy(institutionName = it)) },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = Color(0xFF0B2447),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Editable Institution Name",
+                    tint = Color(0xFF0D9488),
+                    modifier = Modifier.size(15.dp)
+                )
+            }
 
-        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-        Row(
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "${header.classLabel} — Subject: ",
-                color = Color(0xFF0D9488),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
-            BasicTextField(
-                value = header.subjectNameEn,
-                onValueChange = { onUpdateHeader(header.copy(subjectNameEn = it)) },
-                singleLine = true,
-                textStyle = TextStyle(
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (isUrdu) "${header.classLabel} — مضمون: " else "${header.classLabel} — Subject: ",
                     color = Color(0xFF0D9488),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
+                BasicTextField(
+                    value = if (isUrdu) header.subjectNameUr.ifBlank { header.subjectNameEn } else header.subjectNameEn,
+                    onValueChange = {
+                        if (isUrdu) onUpdateHeader(header.copy(subjectNameUr = it))
+                        else onUpdateHeader(header.copy(subjectNameEn = it))
+                    },
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = Color(0xFF0D9488),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = Color(0xFFCBD5E1)
             )
-        }
 
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp),
-            color = Color(0xFFCBD5E1)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                Text("Student Name: ", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                BasicTextField(
-                    value = header.studentNameValue,
-                    onValueChange = { onUpdateHeader(header.copy(studentNameValue = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(color = Color(0xFF0F172A), fontSize = 11.sp),
-                    decorationBox = { inner ->
-                        if (header.studentNameValue.isEmpty()) {
-                            Text("______________", color = Color(0xFF94A3B8), fontSize = 11.sp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (isUrdu) "نام طالب علم: " else "Student Name: ",
+                        color = Color(0xFF0F172A),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    BasicTextField(
+                        value = header.studentNameValue,
+                        onValueChange = { onUpdateHeader(header.copy(studentNameValue = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color(0xFF0F172A), fontSize = 11.sp),
+                        decorationBox = { inner ->
+                            if (header.studentNameValue.isEmpty()) {
+                                Text("______________", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            }
+                            inner()
                         }
-                        inner()
-                    }
-                )
-            }
-            Row(modifier = Modifier.weight(0.8f), verticalAlignment = Alignment.CenterVertically) {
-                Text("Roll No: ", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                BasicTextField(
-                    value = header.rollNumberValue,
-                    onValueChange = { onUpdateHeader(header.copy(rollNumberValue = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(color = Color(0xFF0F172A), fontSize = 11.sp),
-                    decorationBox = { inner ->
-                        if (header.rollNumberValue.isEmpty()) {
-                            Text("_________", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                    )
+                }
+                Row(modifier = Modifier.weight(0.8f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (isUrdu) "رول نمبر: " else "Roll No: ",
+                        color = Color(0xFF0F172A),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    BasicTextField(
+                        value = header.rollNumberValue,
+                        onValueChange = { onUpdateHeader(header.copy(rollNumberValue = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color(0xFF0F172A), fontSize = 11.sp),
+                        decorationBox = { inner ->
+                            if (header.rollNumberValue.isEmpty()) {
+                                Text("_________", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                            }
+                            inner()
                         }
-                        inner()
-                    }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isUrdu) "وقت: " else "Time Allowed: ",
+                        color = Color(0xFF0F172A),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    BasicTextField(
+                        value = header.timeAllowed,
+                        onValueChange = { onUpdateHeader(header.copy(timeAllowed = it)) },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    )
+                }
+                Text(
+                    text = if (isUrdu) "کل نمبر: $totalMarks" else "Total Marks: $totalMarks",
+                    color = Color(0xFF0B2447),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold
                 )
             }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                Text("Time Allowed: ", color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                BasicTextField(
-                    value = header.timeAllowed,
-                    onValueChange = { onUpdateHeader(header.copy(timeAllowed = it)) },
-                    singleLine = true,
-                    textStyle = TextStyle(color = Color(0xFF0F172A), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                )
-            }
-            Text(
-                text = "Total Marks: $totalMarks",
-                color = Color(0xFF0B2447),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
         }
     }
 }
@@ -2298,7 +2364,8 @@ private fun PaperSectionHeaderStrip(
     marksLabel: String,
     language: PaperLanguage
 ) {
-    val stripDirection = if (language == PaperLanguage.URDU) LayoutDirection.Rtl else LayoutDirection.Ltr
+    val isUrdu = (language == PaperLanguage.URDU)
+    val stripDirection = if (isUrdu) LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides stripDirection) {
         Row(
             modifier = Modifier
@@ -2311,20 +2378,23 @@ private fun PaperSectionHeaderStrip(
             Text(
                 text = when (language) {
                     PaperLanguage.ENGLISH -> "Q.$questionNum: $titleEn"
-                    PaperLanguage.URDU -> "سوال نمبر $questionNum: $titleUr"
+                    PaperLanguage.URDU -> "\u200Fسوال نمبر $questionNum: $titleUr"
                     PaperLanguage.BILINGUAL -> "Q.$questionNum: $titleEn | سوال نمبر $questionNum: $titleUr"
                 },
                 color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
+                textAlign = if (isUrdu) TextAlign.Right else TextAlign.Left,
+                style = LocalTextStyle.current.copy(textDirection = if (isUrdu) TextDirection.Rtl else TextDirection.Ltr),
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = marksLabel,
+                text = if (isUrdu) "\u200F$marksLabel" else marksLabel,
                 color = Color(0xFFFFD700),
                 fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                style = LocalTextStyle.current.copy(textDirection = if (isUrdu) TextDirection.Rtl else TextDirection.Ltr)
             )
         }
     }

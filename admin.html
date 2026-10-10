@@ -506,7 +506,45 @@
       return items;
     }
 
-    function parseAndAddBulkQuestions() {
+    async function autoTranslateUrToEn(urduText) {
+      const clean = (urduText || "").trim();
+      if (!clean || !hasUrdu(clean)) return clean;
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=ur&tl=en&dt=t&q=${encodeURIComponent(clean)}`;
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data) && Array.isArray(data[0])) {
+            const translated = data[0].map(seg => (seg && seg[0]) ? seg[0] : "").join("").trim();
+            if (translated) return translated;
+          }
+        }
+      } catch (e) {
+        // fallback below
+      }
+      return clean;
+    }
+
+    async function autoTranslateEnToUr(englishText) {
+      const clean = (englishText || "").trim();
+      if (!clean || hasUrdu(clean)) return clean;
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ur&dt=t&q=${encodeURIComponent(clean)}`;
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (Array.isArray(data) && Array.isArray(data[0])) {
+            const translated = data[0].map(seg => (seg && seg[0]) ? seg[0] : "").join("").trim();
+            if (translated) return translated;
+          }
+        }
+      } catch (e) {
+        // fallback below
+      }
+      return clean;
+    }
+
+    async function parseAndAddBulkQuestions() {
       const chId = document.getElementById("chapterSelect").value;
       const ch = bankData.chapters.find(c => c.id === chId);
       if (!ch) return;
@@ -521,6 +559,7 @@
 
       const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       let addedCount = 0;
+      showStatus("Processing & auto-generating missing English / Urdu Medium...");
 
       if (qType === "MCQ") {
         const parsedMcqs = lines.map(line => {
@@ -567,34 +606,45 @@
           finalMcqs = parsedMcqs;
         }
 
-        finalMcqs.forEach((m, idx) => {
+        for (let idx = 0; idx < finalMcqs.length; idx++) {
+          const m = finalMcqs[idx];
+          const autoQEn = m.qEn || (m.qUr ? await autoTranslateUrToEn(m.qUr) : "");
+          const autoQUr = m.qUr || (m.qEn ? await autoTranslateEnToUr(m.qEn) : "");
+          const autoAEn = m.aEn || (m.aUr ? await autoTranslateUrToEn(m.aUr) : "");
+          const autoBEn = m.bEn || (m.bUr ? await autoTranslateUrToEn(m.bUr) : "");
+          const autoCEn = m.cEn || (m.cUr ? await autoTranslateUrToEn(m.cUr) : "");
+          const autoDEn = m.dEn || (m.dUr ? await autoTranslateUrToEn(m.dUr) : "");
+          const autoAUr = m.aUr || (autoAEn ? await autoTranslateEnToUr(autoAEn) : "");
+          const autoBUr = m.bUr || (autoBEn ? await autoTranslateEnToUr(autoBEn) : "");
+          const autoCUr = m.cUr || (autoCEn ? await autoTranslateEnToUr(autoCEn) : "");
+          const autoDUr = m.dUr || (autoDEn ? await autoTranslateEnToUr(autoDEn) : "");
           bankData.questions.push({
             id: `${ch.id}_mcq_${Date.now()}_${idx}`,
             chapterId: ch.id,
             subjectId: ch.subjectId,
             classLevel: ch.classLevel,
             type: "MCQ",
-            questionEn: m.qEn,
-            questionUr: m.qUr,
-            optionAEn: m.aEn || (m.qEn ? m.aUr : ""),
-            optionBEn: m.bEn || (m.qEn ? m.bUr : ""),
-            optionCEn: m.cEn || (m.qEn ? m.cUr : ""),
-            optionDEn: m.dEn || (m.qEn ? m.dUr : ""),
-            optionAUr: m.aUr || (m.qUr ? m.aEn : ""),
-            optionBUr: m.bUr || (m.qUr ? m.bEn : ""),
-            optionCUr: m.cUr || (m.qUr ? m.cEn : ""),
-            optionDUr: m.dUr || (m.qUr ? m.dEn : ""),
+            questionEn: autoQEn,
+            questionUr: autoQUr,
+            optionAEn: autoAEn,
+            optionBEn: autoBEn,
+            optionCEn: autoCEn,
+            optionDEn: autoDEn,
+            optionAUr: autoAUr,
+            optionBUr: autoBUr,
+            optionCUr: autoCUr,
+            optionDUr: autoDUr,
             correctOption: m.ans,
             marks: 1,
             sortOrder: idx + 1
           });
-        });
+        }
         addedCount = finalMcqs.length;
       } else {
         const rawItems = lines.map(line => {
           const cleanLine = line
             .replace(/^(?:Q(?:uestion)?\.?\s*\d+|\(\d+\)|\d+[\.\)\-\:]|[•\-\*])\s*/i, "")
-            .replace(/^(?:سوال(?:\s*نمبر)?\s*[\d۰-۹]+|[\d۰-۹]+[\.\)\-\:٫])\s*/, "")
+            .replace(/^(?:سوال(?:\s*نمبر)?\s*[\d۰-۹]+|س\s*[\-\:]\s*[\d۰-۹]+|[\d۰-۹]+[\.\)\-\:٫])\s*/, "")
             .trim();
           if (cleanLine.includes("|") && !cleanLine.includes("||")) {
             const parts = cleanLine.split("|").map(p => p.trim()).filter(Boolean);
@@ -609,28 +659,32 @@
         });
 
         const pairedItems = pairShortLongItems(rawItems);
-        pairedItems.forEach((item, idx) => {
+        for (let idx = 0; idx < pairedItems.length; idx++) {
+          const item = pairedItems[idx];
+          const cleanUr = (item.ur || "").replace(/([\u0600-\u06FF]+)\s*\(\s*[A-Za-z][A-Za-z0-9\s\-,/']*\)/g, "$1").trim();
+          const autoEn = item.en || (cleanUr ? await autoTranslateUrToEn(cleanUr) : "");
+          const autoUr = cleanUr || (item.en ? await autoTranslateEnToUr(item.en) : "");
           bankData.questions.push({
             id: `${ch.id}_${qType.toLowerCase()}_${Date.now()}_${idx}`,
             chapterId: ch.id,
             subjectId: ch.subjectId,
             classLevel: ch.classLevel,
             type: qType,
-            questionEn: item.en,
-            questionUr: item.ur,
+            questionEn: autoEn,
+            questionUr: autoUr,
             optionAEn: "", optionBEn: "", optionCEn: "", optionDEn: "",
             optionAUr: "", optionBUr: "", optionCUr: "", optionDUr: "",
             correctOption: "A",
             marks: qType === "SHORT" ? 2 : 5,
             sortOrder: idx + 1
           });
-        });
+        }
         addedCount = pairedItems.length;
       }
 
       document.getElementById("bulkTextInput").value = "";
       renderQuestionsList();
-      showStatus(`Updated ${addedCount} ${qType} question(s) in '${ch.titleEn}' (English & Urdu separated automatically)!`);
+      showStatus(`Updated ${addedCount} ${qType} question(s) in '${ch.titleEn}' (Auto-English, Auto-Urdu & Bilingual Ready)!`);
     }
 
     function renderQuestionsList() {

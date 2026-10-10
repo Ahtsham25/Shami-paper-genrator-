@@ -71,14 +71,32 @@ data class QuestionEntity(
         val (en1, _) = BulkQuestionParser.splitBilingualText(questionEn, isOption = false)
         if (en1.isNotBlank()) return en1
         val (en2, _) = BulkQuestionParser.splitBilingualText(questionUr, isOption = false)
-        return en2
+        if (en2.isNotBlank()) return en2
+        val (_, ur1) = BulkQuestionParser.splitBilingualText(questionUr, isOption = false)
+        val ur = ur1.ifBlank {
+            val (_, ur2) = BulkQuestionParser.splitBilingualText(questionEn, isOption = false)
+            ur2
+        }
+        if (ur.isNotBlank()) {
+            return UrduEnglishAutoTranslator.translateUrduToEnglishOffline(ur, isOption = false)
+        }
+        return ""
     }
 
     fun resolvedQuestionUr(): String {
         val (_, ur1) = BulkQuestionParser.splitBilingualText(questionUr, isOption = false)
         if (ur1.isNotBlank()) return ur1
         val (_, ur2) = BulkQuestionParser.splitBilingualText(questionEn, isOption = false)
-        return ur2
+        if (ur2.isNotBlank()) return ur2
+        val (en1, _) = BulkQuestionParser.splitBilingualText(questionEn, isOption = false)
+        val en = en1.ifBlank {
+            val (en2, _) = BulkQuestionParser.splitBilingualText(questionUr, isOption = false)
+            en2
+        }
+        if (en.isNotBlank()) {
+            return UrduEnglishAutoTranslator.translateEnglishToUrduOffline(en, isOption = false)
+        }
+        return ""
     }
 
     private fun resolveOptEn(optEn: String, optUr: String): String {
@@ -87,7 +105,16 @@ data class QuestionEntity(
         val (en2, _) = BulkQuestionParser.splitBilingualText(optUr, isOption = true)
         if (en2.isNotBlank()) return en2
         val fallback = optEn.ifBlank { optUr }.trim()
-        return if (!BulkQuestionParser.containsUrdu(fallback)) fallback else ""
+        if (fallback.isNotBlank() && !BulkQuestionParser.containsUrdu(fallback)) return fallback
+        val (_, ur1) = BulkQuestionParser.splitBilingualText(optUr, isOption = true)
+        val ur = ur1.ifBlank {
+            val (_, ur2) = BulkQuestionParser.splitBilingualText(optEn, isOption = true)
+            ur2
+        }
+        if (ur.isNotBlank()) {
+            return UrduEnglishAutoTranslator.translateUrduToEnglishOffline(ur, isOption = true)
+        }
+        return ""
     }
 
     private fun resolveOptUr(optEn: String, optUr: String): String {
@@ -95,8 +122,18 @@ data class QuestionEntity(
         if (ur1.isNotBlank()) return ur1
         val (_, ur2) = BulkQuestionParser.splitBilingualText(optEn, isOption = true)
         if (ur2.isNotBlank()) return ur2
-        val fallback = optUr.ifBlank { optEn }.trim()
-        return if (!BulkQuestionParser.containsUrdu(fallback)) fallback else ""
+        val (en1, _) = BulkQuestionParser.splitBilingualText(optEn, isOption = true)
+        val en = en1.ifBlank {
+            val (en2, _) = BulkQuestionParser.splitBilingualText(optUr, isOption = true)
+            en2
+        }.ifBlank {
+            val fb = optEn.ifBlank { optUr }.trim()
+            if (!BulkQuestionParser.containsUrdu(fb)) fb else ""
+        }
+        if (en.isNotBlank()) {
+            return UrduEnglishAutoTranslator.translateEnglishToUrduOffline(en, isOption = true)
+        }
+        return ""
     }
 
     fun resolvedOptionAEn(): String = resolveOptEn(optionAEn, optionAUr)

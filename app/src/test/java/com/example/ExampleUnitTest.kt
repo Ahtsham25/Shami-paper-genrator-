@@ -76,4 +76,168 @@ class ExampleUnitTest {
         assertTrue(AdManager.isGoogleTestUnitId(AdManager.GOOGLE_TEST_REWARDED_ID))
         assertFalse(AdManager.isGoogleTestUnitId("ca-app-pub-1234567890123456/9876543210"))
     }
+
+    @Test
+    fun verifyUrduOnlyAutoTranslatesToEnglishAndStripsGlosses() {
+        val chapter = ChapterEntity(
+            id = "c10_biology_ch1",
+            subjectId = "c10_biology",
+            classLevel = "10",
+            chapterNumber = 1,
+            titleEn = "Ch 10: Gaseous Exchange",
+            titleUr = "باب 10: گیسوں کا تبادلہ"
+        )
+
+        val urduOnlyShorts = """
+            س-1: سلیولر ریسپائریشن اور تنفس (Breathing) میں کیا فرق ہے؟
+            س-2: گیسوں کا تبادلہ (Gaseous exchange) کیا ہے؟
+            س-3: سٹومیٹا اور لینٹی سیلز میں کیا فرق ہے؟
+        """.trimIndent()
+
+        val parsedShorts = BulkQuestionParser.parseShortOrLongQuestions(
+            rawText = urduOnlyShorts,
+            chapter = chapter,
+            type = QuestionType.SHORT
+        )
+        assertEquals(3, parsedShorts.size)
+
+        // Question 1: Urdu is clean (no س-1: and no redundant (Breathing) gloss), English is auto-generated!
+        assertEquals(
+            "What is the difference between cellular respiration and breathing?",
+            parsedShorts[0].resolvedQuestionEn()
+        )
+        assertEquals(
+            "سلیولر ریسپائریشن اور تنفس میں کیا فرق ہے؟",
+            parsedShorts[0].resolvedQuestionUr()
+        )
+        assertFalse(BulkQuestionParser.containsUrdu(parsedShorts[0].resolvedQuestionEn()))
+        assertFalse(BulkQuestionParser.containsEnglish(parsedShorts[0].resolvedQuestionUr()))
+
+        // Question 2:
+        assertEquals(
+            "What is gaseous exchange?",
+            parsedShorts[1].resolvedQuestionEn()
+        )
+        assertEquals(
+            "گیسوں کا تبادلہ کیا ہے؟",
+            parsedShorts[1].resolvedQuestionUr()
+        )
+
+        // Urdu-only MCQ auto-translation test
+        val urduOnlyMcq = """
+            1. ٹریکیا کی لمبائی تقریباً کتنی ہوتی ہے؟
+            (الف) 10 سینٹی میٹر (ب) 12 سینٹی میٹر (ج) 15 سینٹی میٹر (د) 20 سینٹی میٹر | B
+        """.trimIndent()
+
+        val parsedMcqs = BulkQuestionParser.parseMcqQuestions(urduOnlyMcq, chapter)
+        assertEquals(1, parsedMcqs.size)
+        assertEquals("What is the approximate length of the trachea?", parsedMcqs[0].resolvedQuestionEn())
+        assertEquals("ٹریکیا کی لمبائی تقریباً کتنی ہوتی ہے؟", parsedMcqs[0].resolvedQuestionUr())
+        assertEquals("10 cm", parsedMcqs[0].resolvedOptionAEn())
+        assertEquals("10 سینٹی میٹر", parsedMcqs[0].resolvedOptionAUr())
+        assertEquals("12 cm", parsedMcqs[0].resolvedOptionBEn())
+        assertEquals("12 سینٹی میٹر", parsedMcqs[0].resolvedOptionBUr())
+        assertEquals("B", parsedMcqs[0].correctOption)
+    }
+
+    @Test
+    fun verifyAndNormalizePaperBankJson() {
+        val fileCandidates = listOf(
+            java.io.File("../data/shami_paper_bank.json"),
+            java.io.File("data/shami_paper_bank.json")
+        )
+        val bankFile = fileCandidates.firstOrNull { it.exists() } ?: return
+        val moshi = com.squareup.moshi.Moshi.Builder()
+            .addLast(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+            .build()
+        val adapter = moshi.adapter(com.example.data.GitHubPaperBankPayload::class.java).indent("  ")
+        val payload = adapter.fromJson(bankFile.readText()) ?: return
+
+        val normalizedQuestions = payload.questions
+            .groupBy { it.chapterId to it.type }
+            .flatMap { (_, group) ->
+                BulkQuestionParser.normalizeAndPairChapterQuestions(group)
+            }
+
+        val updatedPayload = payload.copy(questions = normalizedQuestions)
+        bankFile.writeText(adapter.toJson(updatedPayload))
+
+        // Verify that science/general subjects have clean English (no Urdu script) and clean Urdu
+        val scienceQuestions = normalizedQuestions.filter { !it.subjectId.contains("urdu") }
+        assertTrue(scienceQuestions.isNotEmpty())
+        for (q in scienceQuestions) {
+            val en = q.resolvedQuestionEn()
+            val ur = q.resolvedQuestionUr()
+            assertTrue("Expected non-blank English for ${q.id}", en.isNotBlank())
+            assertTrue("Expected non-blank Urdu for ${q.id}", ur.isNotBlank())
+            assertFalse("Unexpected Urdu script in English question ${q.id}: $en", BulkQuestionParser.containsUrdu(en))
+            assertTrue("Expected Urdu script in Urdu question ${q.id}: $ur", BulkQuestionParser.containsUrdu(ur))
+        }
+    }
+
+    @Test
+    fun verifyEnglishOnlyAutoTranslatesToUrdu() {
+        val chapter = ChapterEntity(
+            id = "c10_biology_ch1",
+            subjectId = "c10_biology",
+            classLevel = "10",
+            chapterNumber = 1,
+            titleEn = "Ch 10: Gaseous Exchange",
+            titleUr = "باب 10: گیسوں کا تبادلہ"
+        )
+
+        val englishOnlyShorts = """
+            Q1: What is the difference between cellular respiration and breathing?
+            Q2: What is gaseous exchange?
+            Q3: Define bronchioles.
+            Q4: Differentiate between speed and velocity.
+        """.trimIndent()
+
+        val parsedShorts = BulkQuestionParser.parseShortOrLongQuestions(
+            rawText = englishOnlyShorts,
+            chapter = chapter,
+            type = QuestionType.SHORT
+        )
+        assertEquals(4, parsedShorts.size)
+
+        // Q1: English-only -> Urdu auto-generated!
+        assertEquals(
+            "What is the difference between cellular respiration and breathing?",
+            parsedShorts[0].resolvedQuestionEn()
+        )
+        assertEquals(
+            "سلیولر ریسپائریشن اور تنفس میں کیا فرق ہے؟",
+            parsedShorts[0].resolvedQuestionUr()
+        )
+        assertTrue(BulkQuestionParser.containsUrdu(parsedShorts[0].resolvedQuestionUr()))
+        assertFalse(BulkQuestionParser.containsEnglish(parsedShorts[0].resolvedQuestionUr()))
+
+        // Q2:
+        assertEquals("What is gaseous exchange?", parsedShorts[1].resolvedQuestionEn())
+        assertEquals("گیسوں کا تبادلہ کیا ہے؟", parsedShorts[1].resolvedQuestionUr())
+
+        // Q3:
+        assertEquals("Define bronchioles.", parsedShorts[2].resolvedQuestionEn())
+        assertEquals("برونکیولز کی تعریف لکھیں۔", parsedShorts[2].resolvedQuestionUr())
+
+        // Q4: Rule-based novel English question -> Urdu auto-generated!
+        assertEquals("Differentiate between speed and velocity.", parsedShorts[3].resolvedQuestionEn())
+        assertEquals("سپیڈ اور ویلاسٹی میں فرق لکھیں۔", parsedShorts[3].resolvedQuestionUr())
+
+        // English-only MCQ -> Urdu stem and options auto-generated!
+        val englishOnlyMcq = """
+            1. What is the approximate length of the trachea?
+            (A) 10 cm (B) 12 cm (C) 15 cm (D) 20 cm | B
+        """.trimIndent()
+
+        val parsedMcqs = BulkQuestionParser.parseMcqQuestions(englishOnlyMcq, chapter)
+        assertEquals(1, parsedMcqs.size)
+        assertEquals("What is the approximate length of the trachea?", parsedMcqs[0].resolvedQuestionEn())
+        assertEquals("ٹریکیا کی لمبائی تقریباً کتنی ہوتی ہے؟", parsedMcqs[0].resolvedQuestionUr())
+        assertEquals("10 cm", parsedMcqs[0].resolvedOptionAEn())
+        assertEquals("10 سینٹی میٹر", parsedMcqs[0].resolvedOptionAUr())
+        assertEquals("12 cm", parsedMcqs[0].resolvedOptionBEn())
+        assertEquals("12 سینٹی میٹر", parsedMcqs[0].resolvedOptionBUr())
+        assertEquals("B", parsedMcqs[0].correctOption)
+    }
 }

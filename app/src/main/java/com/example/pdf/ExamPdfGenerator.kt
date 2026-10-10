@@ -783,7 +783,7 @@ object ExamPdfGenerator {
                         val urText = cleanUr.ifBlank { q.questionUr }
                         val rowTopY = yPos
                         val h = drawMultilineText(
-                            text = "(${index + 1}) $urText",
+                            text = "${index + 1}۔ $urText",
                             paint = bodyBoldPaint,
                             width = contentWidth - 44,
                             xOffset = MARGIN_H + 40f,
@@ -819,7 +819,7 @@ object ExamPdfGenerator {
                         }
                         if (cleanUr.isNotBlank()) {
                             drawMultilineText(
-                                text = "(${index + 1}) $cleanUr",
+                                text = "${index + 1}۔ $cleanUr",
                                 paint = bodyRegularPaint,
                                 width = contentWidth - 12,
                                 xOffset = MARGIN_H + 6f,
