@@ -568,18 +568,18 @@ private fun QuestionChecklistTab(
             }
         }
 
-        itemsIndexed(questions, key = { _, q -> q.id }) { idx, q ->
+        itemsIndexed(questions, key = { idx, q -> "${q.id}_$idx" }) { idx, q ->
             val checked = q.id in selectedIds
-            val cleanEn = q.resolvedQuestionEn()
-            val cleanUr = q.resolvedQuestionUr()
-            val optAEn = q.resolvedOptionAEn()
-            val optBEn = q.resolvedOptionBEn()
-            val optCEn = q.resolvedOptionCEn()
-            val optDEn = q.resolvedOptionDEn()
-            val optAUr = q.resolvedOptionAUr()
-            val optBUr = q.resolvedOptionBUr()
-            val optCUr = q.resolvedOptionCUr()
-            val optDUr = q.resolvedOptionDUr()
+            val cleanEn = remember(q.id, q.questionEn, q.questionUr) { q.resolvedQuestionEn() }
+            val cleanUr = remember(q.id, q.questionEn, q.questionUr) { q.resolvedQuestionUr() }
+            val optAEn = remember(q.id, q.optionAEn, q.optionAUr) { q.resolvedOptionAEn() }
+            val optBEn = remember(q.id, q.optionBEn, q.optionBUr) { q.resolvedOptionBEn() }
+            val optCEn = remember(q.id, q.optionCEn, q.optionCUr) { q.resolvedOptionCEn() }
+            val optDEn = remember(q.id, q.optionDEn, q.optionDUr) { q.resolvedOptionDEn() }
+            val optAUr = remember(q.id, q.optionAEn, q.optionAUr) { q.resolvedOptionAUr() }
+            val optBUr = remember(q.id, q.optionBEn, q.optionBUr) { q.resolvedOptionBUr() }
+            val optCUr = remember(q.id, q.optionCEn, q.optionCUr) { q.resolvedOptionCUr() }
+            val optDUr = remember(q.id, q.optionDEn, q.optionDUr) { q.resolvedOptionDUr() }
 
             Card(
                 modifier = Modifier
@@ -816,7 +816,7 @@ private fun DragAndDropAndHeaderEditorTab(
             item {
                 SectionReorderHeader("Q.1: Selected MCQs (${mcqs.size} items • ${mcqs.sumOf { it.marks }} Marks)")
             }
-            itemsIndexed(mcqs, key = { _, q -> "reorder_mcq_${q.id}" }) { idx, q ->
+            itemsIndexed(mcqs, key = { idx, q -> "reorder_mcq_${q.id}_$idx" }) { idx, q ->
                 DraggableSelectedQuestionRow(
                     index = idx,
                     totalCount = mcqs.size,
@@ -833,7 +833,7 @@ private fun DragAndDropAndHeaderEditorTab(
             item {
                 SectionReorderHeader("Q.2: Selected Short Questions (${shorts.size} items • ${shorts.sumOf { it.marks }} Marks)")
             }
-            itemsIndexed(shorts, key = { _, q -> "reorder_short_${q.id}" }) { idx, q ->
+            itemsIndexed(shorts, key = { idx, q -> "reorder_short_${q.id}_$idx" }) { idx, q ->
                 DraggableSelectedQuestionRow(
                     index = idx,
                     totalCount = shorts.size,
@@ -850,7 +850,7 @@ private fun DragAndDropAndHeaderEditorTab(
             item {
                 SectionReorderHeader("Q.3: Selected Long Questions (${longs.size} items • ${longs.sumOf { it.marks }} Marks)")
             }
-            itemsIndexed(longs, key = { _, q -> "reorder_long_${q.id}" }) { idx, q ->
+            itemsIndexed(longs, key = { idx, q -> "reorder_long_${q.id}_$idx" }) { idx, q ->
                 DraggableSelectedQuestionRow(
                     index = idx,
                     totalCount = longs.size,
@@ -928,8 +928,8 @@ private fun DraggableSelectedQuestionRow(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
-                val cleanEn = question.resolvedQuestionEn()
-                val cleanUr = question.resolvedQuestionUr()
+                val cleanEn = remember(question.id, question.questionEn, question.questionUr) { question.resolvedQuestionEn() }
+                val cleanUr = remember(question.id, question.questionEn, question.questionUr) { question.resolvedQuestionUr() }
                 when (language) {
                     PaperLanguage.ENGLISH -> {
                         Text(
