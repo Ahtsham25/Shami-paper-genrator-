@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.papermaker.shmqpz"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2
-    versionName = "2.0"
+    versionCode = 3
+    versionName = "3.0"
 
     val isAdminApp = project.findProperty("adminApp")?.toString()?.toBoolean() == true
     buildConfigField("boolean", "IS_ADMIN_APK", isAdminApp.toString())
@@ -75,7 +75,7 @@ android {
   }
 }
 
-// Ensure .env.example and .env always exist so Secrets Gradle Plugin never fails on fresh clones or CI
+// Ensure .env.example always exists so Secrets Gradle Plugin never fails on fresh clones or CI
 val defaultEnvFile = rootProject.file(".env.example")
 if (!defaultEnvFile.exists()) {
   defaultEnvFile.writeText(
@@ -92,15 +92,10 @@ if (!defaultEnvFile.exists()) {
     """.trimIndent() + "\n"
   )
 }
-val localEnvFile = rootProject.file(".env")
-if (!localEnvFile.exists()) {
-  defaultEnvFile.copyTo(localEnvFile, overwrite = true)
-}
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
+// Configure the Secrets Gradle Plugin to use .env (when present) or fall back to .env.example
 secrets {
-  propertiesFileName = ".env"
+  propertiesFileName = if (rootProject.file(".env").exists()) ".env" else ".env.example"
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }

@@ -89,15 +89,24 @@ jobs:
           rm -rf app/build/outputs/apk
           gradle :app:assembleRelease -Pkotlin.compiler.execution.strategy=daemon --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist-main
-          cp app/build/outputs/apk/release/*.apk dist-main/Paper-Maker-Main-App.apk
+          cp app/build/outputs/apk/release/*.apk dist-main/raw-main.apk
 
+          ZIPALIGN_BIN=$(find "${ANDROID_HOME}/build-tools" -name zipalign | sort -V | tail -n 1)
           APKSIGNER_BIN=$(find "${ANDROID_HOME}/build-tools" -name apksigner | sort -V | tail -n 1)
+          if [ -n "${ZIPALIGN_BIN}" ]; then
+            "${ZIPALIGN_BIN}" -p -f 4 dist-main/raw-main.apk dist-main/Paper-Maker-Main-App.apk
+            rm -f dist-main/raw-main.apk
+          else
+            mv dist-main/raw-main.apk dist-main/Paper-Maker-Main-App.apk
+          fi
+
           if [ -n "${APKSIGNER_BIN}" ]; then
             "${APKSIGNER_BIN}" sign \
               --ks "${KEYSTORE_PATH}" \
               --ks-key-alias upload \
               --ks-pass "pass:${STORE_PASSWORD}" \
               --key-pass "pass:${KEY_PASSWORD}" \
+              --min-sdk-version 21 \
               --v1-signing-enabled true \
               --v2-signing-enabled true \
               --v3-signing-enabled true \
@@ -114,21 +123,43 @@ jobs:
           rm -rf app/build/outputs/apk
           gradle :app:assembleRelease -PadminApp=true -Pkotlin.compiler.execution.strategy=daemon --no-daemon --no-build-cache --no-configuration-cache --stacktrace
           mkdir -p dist-admin
-          cp app/build/outputs/apk/release/*.apk dist-admin/Shami-Admin-Panel-App.apk
+          cp app/build/outputs/apk/release/*.apk dist-admin/raw-admin.apk
 
+          ZIPALIGN_BIN=$(find "${ANDROID_HOME}/build-tools" -name zipalign | sort -V | tail -n 1)
           APKSIGNER_BIN=$(find "${ANDROID_HOME}/build-tools" -name apksigner | sort -V | tail -n 1)
+          if [ -n "${ZIPALIGN_BIN}" ]; then
+            "${ZIPALIGN_BIN}" -p -f 4 dist-admin/raw-admin.apk dist-admin/Shami-Admin-Panel-App.apk
+            rm -f dist-admin/raw-admin.apk
+          else
+            mv dist-admin/raw-admin.apk dist-admin/Shami-Admin-Panel-App.apk
+          fi
+
           if [ -n "${APKSIGNER_BIN}" ]; then
             "${APKSIGNER_BIN}" sign \
               --ks "${KEYSTORE_PATH}" \
               --ks-key-alias upload \
               --ks-pass "pass:${STORE_PASSWORD}" \
               --key-pass "pass:${KEY_PASSWORD}" \
+              --min-sdk-version 21 \
               --v1-signing-enabled true \
               --v2-signing-enabled true \
               --v3-signing-enabled true \
               dist-admin/Shami-Admin-Panel-App.apk
             "${APKSIGNER_BIN}" verify --verbose dist-admin/Shami-Admin-Panel-App.apk
           fi
+
+      - name: Publish Direct .apk Downloads to GitHub Releases (No .zip required)
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG_NAME="latest"
+          gh release delete "${TAG_NAME}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "${TAG_NAME}" \
+            dist-main/Paper-Maker-Main-App.apk \
+            dist-admin/Shami-Admin-Panel-App.apk \
+            --title "Shami Academy Paper Maker & Admin APKs (Direct .apk Download)" \
+            --notes "Tap **Paper-Maker-Main-App.apk** or **Shami-Admin-Panel-App.apk** under Assets below to download the direct `.apk` file onto your Android phone (no `.zip` extraction needed)."
 
       - name: Upload 1. Main User App APK Artifact
         uses: actions/upload-artifact@v4
@@ -145,10 +176,13 @@ jobs:
           if-no-files-found: error
 
       - name: Write Installation Instructions to Summary
+        env:
+          REPO_FULL: ${{ github.repository }}
         run: |
-          echo "## ✅ Both Signed Release APKs (v1 + v2 + v3) Built Successfully!" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 📲 Direct 1-Click Android `.apk` Downloads (No `.zip` Extraction Needed!)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "1. Scroll down to the **Artifacts** section at the bottom of this page and download:" >> "$GITHUB_STEP_SUMMARY"
-          echo "   - **`1-Paper-Maker-Main-User-APK`** (Main User App: *Paper Maker*)" >> "$GITHUB_STEP_SUMMARY"
-          echo "   - **`2-Shami-Admin-Panel-APK`** (Separate Admin App: *Shami Admin*)" >> "$GITHUB_STEP_SUMMARY"
-          echo "2. **Important:** GitHub Actions downloads artifacts as a `.zip` file. Open your phone's **Files / File Manager**, tap the downloaded `.zip` file to **Extract (Unzip)** it, and then tap the `.apk` file inside to install!" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **[⬇️ Download Paper-Maker-Main-App.apk (Direct .apk)](https://github.com/${REPO_FULL}/releases/download/latest/Paper-Maker-Main-App.apk)**" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **[⬇️ Download Shami-Admin-Panel-App.apk (Direct .apk)](https://github.com/${REPO_FULL}/releases/download/latest/Shami-Admin-Panel-App.apk)**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo "*(Note: If you download from the **Artifacts** section at the very bottom instead of the direct links above, GitHub wraps artifacts in a `.zip` file — you must Extract/Unzip the `.zip` file first before installing, otherwise Android will say \"There was a problem parsing the package\".)*" >> "$GITHUB_STEP_SUMMARY"
