@@ -447,7 +447,15 @@ class GitHubSyncService(private val context: Context) {
                 "https://raw.githubusercontent.com/$owner/$repo/$branch/$path"
             }
 
-            val reqBuilder = Request.Builder().url(rawUrl).get()
+            val separator = if (rawUrl.contains("?")) "&" else "?"
+            val cacheBustedUrl = "$rawUrl${separator}_cb=${System.currentTimeMillis()}"
+
+            val reqBuilder = Request.Builder()
+                .url(cacheBustedUrl)
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
+                .header("Expires", "0")
+                .get()
             if (config.token.isNotBlank()) {
                 reqBuilder.header("Authorization", "Bearer ${config.token.trim()}")
             }

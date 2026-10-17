@@ -105,6 +105,14 @@ fun SubjectChaptersScreen(
         allChapters.filter { it.subjectId == currentSubject.id }.sortedBy { it.chapterNumber }
     }
 
+    androidx.compose.runtime.LaunchedEffect(chapters, selectedChapterIds) {
+        val chapterIdsSet = chapters.map { it.id }.toSet()
+        val hasAnySelected = selectedChapterIds.any { it in chapterIdsSet }
+        if (!hasAnySelected && chapters.isNotEmpty()) {
+            viewModel.toggleChapterSelection(chapters.first())
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = {
@@ -295,6 +303,7 @@ fun QuestionPickerAndBuilderScreen(
 
     val subject by viewModel.selectedSubject.collectAsState()
     val selectedChapterIds by viewModel.selectedChapterIds.collectAsState()
+    val allChapters by viewModel.allChapters.collectAsState()
     val allQuestions by viewModel.allQuestions.collectAsState()
     val selectedMcqs by viewModel.selectedMcqs.collectAsState()
     val selectedShorts by viewModel.selectedShortQuestions.collectAsState()
@@ -302,9 +311,16 @@ fun QuestionPickerAndBuilderScreen(
     val paperHeader by viewModel.paperHeader.collectAsState()
     val currentLanguage = PaperLanguage.fromCode(paperHeader.languageMode)
 
-    val availableQuestions = remember(allQuestions, selectedChapterIds, subject) {
-        if (selectedChapterIds.isNotEmpty()) {
-            allQuestions.filter { it.chapterId in selectedChapterIds }
+    val availableQuestions = remember(allQuestions, allChapters, selectedChapterIds, subject) {
+        val validChIds = if (subject != null) {
+            val subjChIds = allChapters.filter { it.subjectId == subject!!.id }.map { it.id }.toSet()
+            selectedChapterIds.filter { it in subjChIds }.toSet()
+        } else {
+            selectedChapterIds
+        }
+        if (validChIds.isNotEmpty()) {
+            val matched = allQuestions.filter { it.chapterId in validChIds }
+            if (matched.isNotEmpty()) matched else if (subject != null) allQuestions.filter { it.subjectId == subject!!.id } else allQuestions
         } else if (subject != null) {
             allQuestions.filter { it.subjectId == subject!!.id }
         } else {

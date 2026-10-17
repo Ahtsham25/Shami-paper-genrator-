@@ -138,16 +138,39 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
     private fun startupInitializeDatabaseAndSync() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val assetBankPayload = try {
+                    getApplication<Application>().assets.open("shami_paper_bank.json").use { stream ->
+                        val text = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                        gitHubService.decodeBankFromJson(text)
+                    }
+                } catch (t: Throwable) {
+                    null
+                }
+
                 val existingSubjects = dao.getAllSubjectsOnce()
                 if (existingSubjects.isEmpty()) {
-                    val subjects = SeedData.defaultSubjects()
-                    val chapters = SeedData.defaultChapters(subjects)
-                    val questions = SeedData.defaultQuestions(chapters, subjects)
-                    dao.insertSubjects(subjects)
-                    dao.insertChapters(chapters)
-                    dao.insertQuestions(questions)
+                    if (assetBankPayload != null) {
+                        applyBankPayloadToDatabase(assetBankPayload)
+                    } else {
+                        val subjects = SeedData.defaultSubjects()
+                        val chapters = SeedData.defaultChapters(subjects)
+                        val questions = SeedData.defaultQuestions(chapters, subjects)
+                        dao.insertSubjects(subjects)
+                        dao.insertChapters(chapters)
+                        dao.insertQuestions(questions)
+                    }
                 } else {
-                    normalizeAllExistingQuestionsInDatabase()
+                    if (assetBankPayload != null) {
+                        val existingBioChs = dao.getAllChaptersOnce().filter { it.subjectId == "c10_biology" }
+                        val existingBioQs = dao.getAllQuestionsOnce().filter { it.subjectId == "c10_biology" }
+                        if (existingBioChs.size < 10 || existingBioQs.size < 200) {
+                            applyBankPayloadToDatabase(assetBankPayload)
+                        } else {
+                            normalizeAllExistingQuestionsInDatabase()
+                        }
+                    } else {
+                        normalizeAllExistingQuestionsInDatabase()
+                    }
                 }
             } catch (t: Throwable) {
                 Log.w("PaperMakerVM", "Startup seed/normalize warning: ${t.message}")
@@ -158,7 +181,13 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
                 if ((cfg.owner.isNotBlank() && cfg.repo.isNotBlank()) || cfg.customRawUrl.isNotBlank()) {
                     val res = gitHubService.fetchBankFromGitHub(cfg)
                     if (res is GitHubSyncResult.Success && res.payload != null) {
-                        applyBankPayloadToDatabase(res.payload)
+                        val currentLocalCount = dao.getAllQuestionsOnce().size
+                        val remoteCount = res.payload.questions.size
+                        if (remoteCount >= currentLocalCount) {
+                            applyBankPayloadToDatabase(res.payload)
+                        } else {
+                            Log.i("PaperMakerVM", "Preserving local bank ($currentLocalCount questions > remote $remoteCount questions)")
+                        }
                     }
                 }
             } catch (t: Throwable) {
@@ -230,8 +259,11 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
     fun openSubject(subject: SubjectEntity) {
         _selectedSubject.value = subject
         _selectedClassLevel.value = subject.classLevel
-        val firstChId = "${subject.id}_ch1"
-        _selectedChapterIds.value = setOf(firstChId)
+        val chaptersForSubj = allChapters.value
+            .filter { it.subjectId == subject.id }
+            .sortedBy { it.chapterNumber }
+        val firstChapter = chaptersForSubj.firstOrNull()
+        _selectedChapterIds.value = if (firstChapter != null) setOf(firstChapter.id) else emptySet()
         _paperHeader.value = _paperHeader.value.copy(
             classLabel = if (subject.classLevel == "9") "Class 9th" else "Class 10th",
             subjectNameEn = subject.nameEn,
@@ -241,9 +273,25 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun proceedToQuestionPicker() {
-        if (_selectedChapterIds.value.isEmpty()) {
-            _statusMessage.value = "Please select at least one chapter first."
-            return
+        val subject = _selectedSubject.value
+        val validChapterIds = if (subject != null) {
+            val subjChs = allChapters.value.filter { it.subjectId == subject.id }.map { it.id }.toSet()
+            _selectedChapterIds.value.filter { it in subjChs }.toSet()
+        } else {
+            _selectedChapterIds.value
+        }
+        if (validChapterIds.isEmpty()) {
+            val fallbackCh = if (subject != null) {
+                allChapters.value.filter { it.subjectId == subject.id }.minByOrNull { it.chapterNumber }
+            } else null
+            if (fallbackCh != null) {
+                _selectedChapterIds.value = setOf(fallbackCh.id)
+            } else {
+                _statusMessage.value = "Please select at least one chapter first."
+                return
+            }
+        } else {
+            _selectedChapterIds.value = validChapterIds
         }
         _activeScreen.value = ActiveScreen.QUESTION_PICKER_AND_BUILDER
     }
@@ -622,7 +670,7 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun syncDatabaseFromGitHub(config: GitHubRepoConfig) {
+    fun syncDatabaseFromGitHub(config: GitHubRepoConfig, force: Boolean = false) {
         viewModelScope.launch {
             _isSyncingGitHub.value = true
             gitHubService.saveConfig(config)
@@ -630,9 +678,17 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
                 is GitHubSyncResult.Success -> {
                     val payload = res.payload
                     if (payload != null) {
-                        applyBankPayloadToDatabase(payload)
+                        val currentLocalCount = dao.getAllQuestionsOnce().size
+                        val remoteCount = payload.questions.size
+                        if (force || remoteCount >= currentLocalCount) {
+                            applyBankPayloadToDatabase(payload)
+                            _statusMessage.value = res.message
+                        } else {
+                            _statusMessage.value = "Local database has $currentLocalCount questions (more than remote $remoteCount). Kept local questions intact."
+                        }
+                    } else {
+                        _statusMessage.value = res.message
                     }
-                    _statusMessage.value = res.message
                 }
                 is GitHubSyncResult.Error -> {
                     _statusMessage.value = res.errorMessage
@@ -687,7 +743,16 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
         }
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val parsed = if (type == QuestionType.MCQ) {
+                // Auto-detect if user has selected SHORT/LONG by mistake but pasted MCQs
+                val lines = rawText.lines().map { it.trim() }.filter { it.isNotBlank() }
+                val pipeLines = lines.filter { it.count { c -> c == '|' } >= 2 }
+                val effectiveType = if (type != QuestionType.MCQ && pipeLines.size >= lines.size / 2 && pipeLines.isNotEmpty()) {
+                    QuestionType.MCQ
+                } else {
+                    type
+                }
+
+                val parsed = if (effectiveType == QuestionType.MCQ) {
                     BulkQuestionParser.parseMcqQuestions(
                         rawText = rawText,
                         chapter = chapter
@@ -696,7 +761,7 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
                     BulkQuestionParser.parseShortOrLongQuestions(
                         rawText = rawText,
                         chapter = chapter,
-                        type = type
+                        type = effectiveType
                     )
                 }
                 if (parsed.isEmpty()) {
@@ -706,17 +771,17 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
                 if (replaceExisting) {
                     val normalized = BulkQuestionParser.normalizeAndPairChapterQuestions(parsed)
                     val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(normalized)
-                    dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
+                    dao.deleteQuestionsByChapterAndType(chapter.id, effectiveType.code)
                     dao.insertQuestions(enriched)
-                    _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
+                    _statusMessage.value = "Updated ${enriched.size} ${effectiveType.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
                 } else {
                     val existingInChapterType = dao.getAllQuestionsOnce()
-                        .filter { it.chapterId == chapter.id && it.type == type.code }
+                        .filter { it.chapterId == chapter.id && it.type == effectiveType.code }
                     val combined = BulkQuestionParser.normalizeAndPairChapterQuestions(existingInChapterType + parsed)
                     val enriched = com.example.data.UrduEnglishAutoTranslator.autoTranslateQuestionsSuspend(combined)
-                    dao.deleteQuestionsByChapterAndType(chapter.id, type.code)
+                    dao.deleteQuestionsByChapterAndType(chapter.id, effectiveType.code)
                     dao.insertQuestions(enriched)
-                    _statusMessage.value = "Updated ${enriched.size} ${type.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
+                    _statusMessage.value = "Updated ${enriched.size} ${effectiveType.titleEn} (Auto-English, Auto-Urdu & Bilingual Ready) in ${chapter.titleEn}!"
                 }
             } catch (t: Throwable) {
                 _statusMessage.value = "Error saving questions: ${t.localizedMessage ?: "Unknown error"}"

@@ -264,10 +264,16 @@ object SeedData {
             "Unit 4: Data Structures & Loops" to "یونٹ 4: ڈیٹا سٹرکچرز اور لوپس"
         ),
         "c10_biology" to listOf(
-            "Ch 10: Gaseous Exchange" to "باب 10: گیسوں کا تبادلہ",
-            "Ch 11: Homeostasis" to "باب 11: ہومیو سٹیسس",
-            "Ch 12: Coordination and Control" to "باب 12: کوآرڈینیشن اور کنٹرول",
-            "Ch 13: Support and Movement" to "باب 13: سہارا اور حرکت"
+            "Ch 1: Nutrition and Digestion" to "باب 1: نیوٹریشن اور ڈائجیشن",
+            "Ch 2: Respiration & Gaseous Exchange" to "باب 2: تنفس اور گیسوں کا تبادلہ",
+            "Ch 3: Transport & Blood Circulation" to "باب 3: ٹرانسپورٹ اور بلڈ سرکولیشن",
+            "Ch 4: Excretion & Homeostasis" to "باب 4: اخراج اور ہومیوسٹیسس",
+            "Ch 5: Coordination and Control" to "باب 5: کوآرڈینیشن اور کنٹرول",
+            "Ch 6: Reproduction" to "باب 6: ریپروڈکشن اور عملِ تولید",
+            "Ch 7: Inheritance and Genetics" to "باب 7: وراثت اور جینیٹکس",
+            "Ch 8: Biotechnology" to "باب 8: بائیوٹیکنالوجی",
+            "Ch 9: Health, Disease & Immunity" to "باب 9: صحت، بیماریاں اور قوتِ مدافعت",
+            "Ch 10: Evolution" to "باب 10: ارتقاء"
         )
     )
 
