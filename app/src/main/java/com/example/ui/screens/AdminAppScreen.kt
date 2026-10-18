@@ -42,6 +42,15 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
@@ -72,6 +81,10 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.ai.ExtractedQuestionDraft
+import com.example.ai.GeminiPdfQuestionExtractor
 import com.example.BuildConfig
 import com.example.ads.AdManager
 import com.example.data.ChapterEntity
@@ -214,6 +227,11 @@ fun AdminAppScreen(
                 onClick = { adminTabIndex = 3 },
                 text = { Text("4. AdMob IDs", fontWeight = FontWeight.Bold) }
             )
+            Tab(
+                selected = adminTabIndex == 4,
+                onClick = { adminTabIndex = 4 },
+                text = { Text("5. AI PDF Extractor", fontWeight = FontWeight.Bold) }
+            )
         }
 
         when (adminTabIndex) {
@@ -268,6 +286,17 @@ fun AdminAppScreen(
                 }
             )
             3 -> AdminAdMobConfigTab(
+                viewModel = viewModel,
+                onPushToMainApp = {
+                    viewModel.uploadCurrentDatabaseToGitHub(currentConfig())
+                }
+            )
+            4 -> AdminPdfExtractorTab(
+                selectedClass = selectedClass,
+                onSelectClass = { selectedClass = it },
+                classSubjects = classSubjects,
+                activeSubject = activeSubject,
+                onSelectSubject = { selectedSubjectId = it.id },
                 viewModel = viewModel,
                 onPushToMainApp = {
                     viewModel.uploadCurrentDatabaseToGitHub(currentConfig())
@@ -1060,6 +1089,546 @@ private fun AdminClassAndBookSelectorCard(
                                 ),
                                 modifier = Modifier.weight(1f)
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdminPdfExtractorTab(
+    selectedClass: String,
+    onSelectClass: (String) -> Unit,
+    classSubjects: List<SubjectEntity>,
+    activeSubject: SubjectEntity?,
+    onSelectSubject: (SubjectEntity) -> Unit,
+    viewModel: PaperMakerViewModel,
+    onPushToMainApp: () -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val prefs = remember { context.getSharedPreferences("shami_admin_prefs", android.content.Context.MODE_PRIVATE) }
+
+    var geminiApiKey by remember { mutableStateOf(prefs.getString("gemini_api_key", "").orEmpty()) }
+    var showApiKey by remember { mutableStateOf(false) }
+    var selectedEngine by remember { mutableStateOf("GEMINI") } // "GEMINI" or "OFFLINE"
+
+    var selectedPdfUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedPdfName by remember { mutableStateOf("") }
+    var pastedNotesText by remember { mutableStateOf("") }
+
+    var isExtracting by remember { mutableStateOf(false) }
+    var progressMessage by remember { mutableStateOf("") }
+    var extractedDrafts by remember { mutableStateOf<List<ExtractedQuestionDraft>>(emptyList()) }
+    var isSavedToDb by remember { mutableStateOf(false) }
+
+    val pdfPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedPdfUri = uri
+            selectedPdfName = uri.lastPathSegment ?: "document.pdf"
+            viewModel.showStatus("PDF selected: $selectedPdfName")
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color(0xFF0F172A))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD700),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "AI PDF & Notes Question Extractor",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            fontSize = 16.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "پی ڈی ایف اپلوڈ کریں، مصنوعی ذہانت (AI) تفصیلی معائنہ کر کے تمام ایم سی کیوز، شارٹ اور لانگ سوالات خود بخود نکال کر مطلوبہ کتاب کے چیپٹرز میں ڈال دے گی۔",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Right,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        item {
+            AdminClassAndBookSelectorCard(
+                selectedClass = selectedClass,
+                onSelectClass = onSelectClass,
+                classSubjects = classSubjects,
+                activeSubject = activeSubject,
+                onSelectSubject = onSelectSubject
+            )
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "1. Upload PDF Document or Paste Notes Text",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF0B2447)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { pdfPickerLauncher.launch("application/pdf") },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Choose PDF File", fontSize = 12.sp)
+                        }
+
+                        if (selectedPdfUri != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    selectedPdfUri = null
+                                    selectedPdfName = ""
+                                },
+                                modifier = Modifier.weight(0.6f)
+                            ) {
+                                Text("Clear PDF", fontSize = 11.sp, color = Color.Red)
+                            }
+                        }
+                    }
+
+                    if (selectedPdfName.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFE0F2FE), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF0284C7), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Selected: $selectedPdfName",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF0369A1)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "یا براہ راست نوٹس / پی ڈی ایف کا متن نیچے پیسٹ کریں:",
+                        fontSize = 12.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Right,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = pastedNotesText,
+                        onValueChange = { pastedNotesText = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(110.dp),
+                        placeholder = {
+                            Text(
+                                "Paste any questions text or notes here...",
+                                fontSize = 12.sp
+                            )
+                        },
+                        textStyle = LocalTextStyle.current.copy(fontSize = 13.sp)
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "2. Select Extraction Engine",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = Color(0xFF0B2447)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedEngine == "GEMINI",
+                            onClick = { selectedEngine = "GEMINI" },
+                            label = { Text("Gemini AI Ultra (AI Studio)", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF0B2447),
+                                selectedLabelColor = Color.White
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = selectedEngine == "OFFLINE",
+                            onClick = { selectedEngine = "OFFLINE" },
+                            label = { Text("Smart Offline Parser", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF0D9488),
+                                selectedLabelColor = Color.White
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    if (selectedEngine == "GEMINI") {
+                        OutlinedTextField(
+                            value = geminiApiKey,
+                            onValueChange = {
+                                geminiApiKey = it
+                                prefs.edit().putString("gemini_api_key", it).apply()
+                            },
+                            label = { Text("Google Gemini API Key") },
+                            placeholder = { Text("AIzaSy...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = if (showApiKey) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(onClick = { showApiKey = !showApiKey }) {
+                                    Icon(
+                                        imageVector = if (showApiKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = "Toggle API Key visibility"
+                                    )
+                                }
+                            },
+                            supportingText = {
+                                Text("Get free key from aistudio.google.com/app/apikey (Key is saved securely)", fontSize = 11.sp)
+                            }
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            if (activeSubject == null) {
+                                viewModel.showStatus("Please select a subject first.")
+                                return@Button
+                            }
+                            if (selectedEngine == "GEMINI" && geminiApiKey.isBlank()) {
+                                viewModel.showStatus("Please enter your Gemini API Key first.")
+                                return@Button
+                            }
+                            if (selectedPdfUri == null && pastedNotesText.isBlank()) {
+                                viewModel.showStatus("Please select a PDF file or paste text notes.")
+                                return@Button
+                            }
+
+                            coroutineScope.launch {
+                                isExtracting = true
+                                isSavedToDb = false
+                                progressMessage = "Analyzing document..."
+
+                                try {
+                                    val drafts = if (selectedEngine == "GEMINI") {
+                                        if (selectedPdfUri != null) {
+                                            progressMessage = "Scanning PDF pages with Gemini AI..."
+                                            val res = GeminiPdfQuestionExtractor.extractFromPdfUriViaGemini(
+                                                context = context,
+                                                pdfUri = selectedPdfUri!!,
+                                                apiKey = geminiApiKey.trim(),
+                                                onProgress = { p, tot, found ->
+                                                    progressMessage = "Scanning page $p/$tot (Found $found questions so far)..."
+                                                }
+                                            )
+                                            res.getOrThrow()
+                                        } else {
+                                            progressMessage = "Analyzing text with Gemini AI..."
+                                            val res = GeminiPdfQuestionExtractor.extractFromTextViaGemini(
+                                                apiKey = geminiApiKey.trim(),
+                                                text = pastedNotesText
+                                            )
+                                            res.getOrThrow()
+                                        }
+                                    } else {
+                                        progressMessage = "Parsing with Smart Offline Engine..."
+                                        val text = if (selectedPdfUri != null) {
+                                            GeminiPdfQuestionExtractor.extractTextFromPdfStream(context, selectedPdfUri!!)
+                                        } else {
+                                            pastedNotesText
+                                        }
+                                        GeminiPdfQuestionExtractor.extractUsingOfflineRuleEngine(text)
+                                    }
+
+                                    extractedDrafts = drafts
+                                    if (drafts.isEmpty()) {
+                                        viewModel.showStatus("No questions detected. Try pasting raw text or check PDF.")
+                                    } else {
+                                        viewModel.showStatus("Found ${drafts.size} questions! Review below and save.")
+                                    }
+                                } catch (e: Exception) {
+                                    viewModel.showStatus("Extraction error: ${e.message}")
+                                } finally {
+                                    isExtracting = false
+                                }
+                            }
+                        },
+                        enabled = !isExtracting,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0B2447))
+                    ) {
+                        if (isExtracting) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(progressMessage, fontSize = 12.sp)
+                        } else {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Start Auto Extraction (خودکار سوالات نکالیں)", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (extractedDrafts.isNotEmpty()) {
+            item {
+                val mcqCount = extractedDrafts.count { it.type == "MCQ" }
+                val shortCount = extractedDrafts.count { it.type == "SHORT" }
+                val longCount = extractedDrafts.count { it.type == "LONG" }
+                val chsCount = extractedDrafts.map { it.chapterNumber }.distinct().size
+
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Extracted Questions Summary",
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF166534),
+                                fontSize = 15.sp
+                            )
+                            Text(
+                                text = "Total: ${extractedDrafts.size}",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF166534),
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(Color(0xFFDCFCE7), RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("MCQs", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF166534))
+                                    Text("$mcqCount", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF166534))
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(Color(0xFFE0F2FE), RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Short Qs", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0369A1))
+                                    Text("$shortCount", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF0369A1))
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(Color(0xFFF3E8FF), RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Long Qs", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6B21A8))
+                                    Text("$longCount", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF6B21A8))
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(Color(0xFFFEF3C7), RoundedCornerShape(8.dp))
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Chapters", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF92400E))
+                                    Text("$chsCount", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF92400E))
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    if (activeSubject != null) {
+                                        viewModel.insertExtractedBatchQuestions(activeSubject, extractedDrafts) {
+                                            isSavedToDb = true
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    if (isSavedToDb) "Saved! (دوبارہ محفوظ کریں)" else "Save to Database",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Button(
+                                onClick = onPushToMainApp,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D9488)),
+                                modifier = Modifier.weight(0.9f)
+                            ) {
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Upload to Main App", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            val groupedByChapter = extractedDrafts.groupBy { it.chapterNumber }
+            groupedByChapter.forEach { (chNum, chQuestions) ->
+                item {
+                    val titleEn = chQuestions.firstOrNull()?.chapterTitleEn?.ifBlank { "Chapter $chNum" } ?: "Chapter $chNum"
+                    val titleUr = chQuestions.firstOrNull()?.chapterTitleUr?.ifBlank { "باب $chNum" } ?: "باب $chNum"
+
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Ch $chNum: $titleEn",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF0B2447)
+                                )
+                                Text(
+                                    text = "$titleUr (${chQuestions.size} سوالات)",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF0D9488),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            HorizontalDivider(color = Color(0xFFE2E8F0))
+
+                            chQuestions.take(15).forEachIndexed { idx, q ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFF8FAFC), RoundedCornerShape(6.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        val badgeColor = when (q.type) {
+                                            "MCQ" -> Color(0xFF16A34A)
+                                            "LONG" -> Color(0xFF9333EA)
+                                            else -> Color(0xFF0284C7)
+                                        }
+                                        Text(
+                                            text = "${idx + 1}. [${q.type}]",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeColor
+                                        )
+                                        if (q.type == "MCQ") {
+                                            Text(
+                                                text = "Ans: ${q.correctOption}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF16A34A)
+                                            )
+                                        }
+                                    }
+
+                                    if (q.questionEn.isNotBlank()) {
+                                        Text(
+                                            text = q.questionEn,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                    }
+                                    if (q.questionUr.isNotBlank()) {
+                                        Text(
+                                            text = q.questionUr,
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF1E293B),
+                                            textAlign = TextAlign.Right,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (chQuestions.size > 15) {
+                                Text(
+                                    text = "+ ${chQuestions.size - 15} more questions in this chapter...",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                )
+                            }
                         }
                     }
                 }

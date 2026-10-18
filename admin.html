@@ -98,7 +98,39 @@
       font-weight: 700;
       margin-left: 6px;
     }
+    .badge-mcq { background: #DCFCE7; color: #166534; }
+    .badge-short { background: #E0F2FE; color: #0369A1; }
+    .badge-long { background: #F3E8FF; color: #6B21A8; }
+    .drop-zone {
+      border: 2px dashed #94A3B8;
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      background: #F8FAFC;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--emerald);
+      background: #F0FDF4;
+    }
+    .progress-bar-container {
+      width: 100%;
+      height: 10px;
+      background: #E2E8F0;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 10px;
+      display: none;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--emerald), #0284C7);
+      transition: width 0.3s ease;
+    }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
   <header>
@@ -193,9 +225,112 @@
       </div>
     </div>
 
-    <!-- 3. Bulk Paste & Edit MCQs, Short Questions & Long Questions -->
+    <!-- 3. AI Automated PDF & Notes Question Extractor (مکمل خودکار پی ڈی ایف سوالات نکالنے کا سسٹم) -->
+    <div class="card" style="border: 2px solid #0D9488; background: #FAFDFB;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:1px solid #CBD5E1; padding-bottom:10px;">
+        <h2 style="margin:0; border:none; padding:0; color:#0F172A; display:flex; align-items:center; gap:8px;">
+          <span>✨ 3. AI Automated PDF &amp; Notes Question Extractor</span>
+          <span class="badge" style="background:#0D9488; color:#fff;">Google Gemini AI &amp; Smart OCR</span>
+        </h2>
+        <span style="font-size:12px; color:#0D9488; font-weight:700;">تفصیلی معائنہ، چیپٹرز کی خودکار تقسیم اور مکمل سوالات</span>
+      </div>
+
+      <p style="font-size:13px; color:var(--muted); margin: 10px 0 14px; line-height: 1.5;">
+        یہاں کسی بھی درسی کتاب یا نوٹس کی پی ڈی ایف (PDF) فائل اپلوڈ کریں۔ سسٹم ہر ہر صفحے کا تفصیلی معائنہ کر کے تمام <strong>MCQs (کثیر الانتخابی سوالات)</strong>، <strong>Short Questions (مختصر سوالات)</strong> اور <strong>Long Questions (تفصیلی سوالات)</strong> کو اردو اور انگریزی ترجمے کے ساتھ خود بخود نکال کر متعلقہ چیپٹرز میں ڈال دے گا۔
+      </p>
+
+      <div class="grid-3">
+        <div>
+          <label>1. Target Class (کلاس منتخب کریں)</label>
+          <select id="extractorClassSelect" onchange="onExtractorClassChanged()">
+            <option value="9">Class 9th (نویں کلاس)</option>
+            <option value="10" selected>Class 10th (دسویں کلاس)</option>
+          </select>
+        </div>
+        <div>
+          <label>2. Target Subject / Book (کتاب / مضمون)</label>
+          <select id="extractorSubjectSelect"></select>
+        </div>
+        <div>
+          <label>3. Extraction Engine (انجن منتخب کریں)</label>
+          <select id="extractorEngineSelect" onchange="toggleGeminiKeyVisibility()">
+            <option value="GEMINI" selected>🌟 Google Gemini 2.5 Flash AI (سپر اسمارٹ - اردو انگلش خودکار)</option>
+            <option value="OFFLINE">⚡ Smart Offline Parser (آف لائن پیٹرن تجزیہ)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="geminiKeyRow" class="grid-2" style="margin-top:12px;">
+        <div>
+          <label>Google Gemini API Key (محفوظ ہو جائے گی)</label>
+          <input id="geminiApiKeyInput" type="password" placeholder="AIzaSy..." oninput="saveGeminiKey()" />
+        </div>
+        <div>
+          <label>Gemini Model</label>
+          <select id="geminiModelSelect">
+            <option value="gemini-2.5-flash" selected>gemini-2.5-flash (Fast, Highly Accurate)</option>
+            <option value="gemini-3.5-flash">gemini-3.5-flash (Deep Reasoning)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div style="margin-top: 14px;">
+        <label>Upload PDF Document (پی ڈی ایف فائل اپلوڈ کریں):</label>
+        <div id="pdfDropZone" class="drop-zone" onclick="document.getElementById('pdfFileInput').click()">
+          <input type="file" id="pdfFileInput" accept=".pdf,.txt" style="display:none;" onchange="handlePdfFileSelected(event)" />
+          <div style="font-size:28px; margin-bottom:6px;">📄</div>
+          <strong style="color:var(--navy); font-size:14px;">Click here or Drag &amp; Drop any PDF file</strong><br/>
+          <span style="font-size:12px; color:var(--muted);">Supports textbook chapters, solved notes, guides (.pdf or .txt)</span>
+          <div id="selectedPdfInfo" style="margin-top:8px; font-weight:700; color:#0D9488; font-size:13px; display:none;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <label>یا براہ راست نوٹس کا متن نیچے پیسٹ کریں (Optional Text / Notes Paste):</label>
+        <textarea id="pastedNotesInput" style="min-height:90px;" placeholder="پی ڈی ایف یا نوٹس کا متن یہاں پیسٹ کریں اگر فائل موجود نہیں..."></textarea>
+      </div>
+
+      <div class="progress-bar-container" id="extractorProgressContainer">
+        <div class="progress-bar-fill" id="extractorProgressBar"></div>
+      </div>
+      <div id="extractorStatusLabel" style="font-size:12px; font-weight:600; color:#0284C7; margin-top:6px; display:none;"></div>
+
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn-emerald" id="startExtractionBtn" onclick="runAutomatedExtraction()">🚀 Start Automatic Extraction (خودکار سوالات نکالیں)</button>
+        <button class="btn-gold" id="applyExtractedBtn" onclick="applyExtractedQuestionsToBank()" style="display:none;">📥 Insert All Extracted Questions into Database</button>
+        <button class="btn-primary" id="uploadAfterExtractBtn" onclick="pushToGitHub()" style="display:none;">☁️ Upload Immediately to GitHub</button>
+      </div>
+
+      <!-- Results Stats & Preview -->
+      <div id="extractedResultsContainer" style="margin-top:18px; display:none;">
+        <div class="grid-4" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:14px;">
+          <div style="background:#DCFCE7; padding:12px; border-radius:8px; text-align:center;">
+            <div style="font-size:11px; font-weight:700; color:#166534;">MCQs Extracted</div>
+            <div id="statMcqCount" style="font-size:20px; font-weight:800; color:#166534;">0</div>
+          </div>
+          <div style="background:#E0F2FE; padding:12px; border-radius:8px; text-align:center;">
+            <div style="font-size:11px; font-weight:700; color:#0369A1;">Short Questions</div>
+            <div id="statShortCount" style="font-size:20px; font-weight:800; color:#0369A1;">0</div>
+          </div>
+          <div style="background:#F3E8FF; padding:12px; border-radius:8px; text-align:center;">
+            <div style="font-size:11px; font-weight:700; color:#6B21A8;">Long Questions</div>
+            <div id="statLongCount" style="font-size:20px; font-weight:800; color:#6B21A8;">0</div>
+          </div>
+          <div style="background:#FEF3C7; padding:12px; border-radius:8px; text-align:center;">
+            <div style="font-size:11px; font-weight:700; color:#92400E;">Chapters Detected</div>
+            <div id="statChapterCount" style="font-size:20px; font-weight:800; color:#92400E;">0</div>
+          </div>
+        </div>
+
+        <h3 style="font-size:14px; margin-bottom:8px; color:var(--navy);">Extracted Questions Preview (Review before saving):</h3>
+        <div id="extractedPreviewList" style="max-height:400px; overflow-y:auto; border:1px solid #CBD5E1; border-radius:8px; padding:10px; background:#fff;"></div>
+      </div>
+    </div>
+
+    <!-- 4. Bulk Paste & Edit MCQs, Short Questions & Long Questions -->
     <div class="card">
-      <h2>3. Add / Bulk Paste MCQs, Short Questions &amp; Long Questions</h2>
+      <h2>4. Add / Bulk Paste MCQs, Short Questions &amp; Long Questions</h2>
       <div class="grid-2">
         <div>
           <label>Select Question Type</label>
@@ -233,9 +368,9 @@
       <div id="questionsListContainer"></div>
     </div>
 
-    <!-- 4. Google AdMob Remote Configuration -->
+    <!-- 5. Google AdMob Remote Configuration -->
     <div class="card">
-      <h2>4. Google AdMob Configuration (Test vs. Live Ads)</h2>
+      <h2>5. Google AdMob Configuration (Test vs. Live Ads)</h2>
       <p style="font-size:12px; color:var(--muted); margin-top:0;">
         When you switch Ad Mode to <strong>LIVE Google AdMob Ads</strong> and paste your real Ad Unit IDs below, the Android app will automatically disable Test Ads and display your Live Ads.
       </p>
@@ -815,7 +950,476 @@
       }
     }
 
+    // ----------------------------------------------------
+    // AI Automated PDF & Notes Extractor Implementation
+    // ----------------------------------------------------
+    let selectedPdfFile = null;
+    let currentExtractedQuestions = [];
+
+    function initAiExtractor() {
+      const savedKey = localStorage.getItem("shami_gemini_api_key") || "";
+      const keyInput = document.getElementById("geminiApiKeyInput");
+      if (keyInput) keyInput.value = savedKey;
+
+      onExtractorClassChanged();
+
+      const dropZone = document.getElementById("pdfDropZone");
+      if (dropZone) {
+        dropZone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          dropZone.classList.add("dragover");
+        });
+        dropZone.addEventListener("dragleave", () => {
+          dropZone.classList.remove("dragover");
+        });
+        dropZone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dropZone.classList.remove("dragover");
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            selectedPdfFile = e.dataTransfer.files[0];
+            showSelectedPdfInfo(selectedPdfFile);
+          }
+        });
+      }
+    }
+
+    function onExtractorClassChanged() {
+      const cls = document.getElementById("extractorClassSelect").value;
+      const subSelect = document.getElementById("extractorSubjectSelect");
+      if (!subSelect) return;
+      const subjects = bankData.subjects.filter(s => s.classLevel === cls);
+      subSelect.innerHTML = subjects.map(s => `<option value="${s.id}">${s.nameEn} (${s.nameUr})</option>`).join("");
+    }
+
+    function toggleGeminiKeyVisibility() {
+      const engine = document.getElementById("extractorEngineSelect").value;
+      const row = document.getElementById("geminiKeyRow");
+      if (row) row.style.display = (engine === "GEMINI") ? "grid" : "none";
+    }
+
+    function saveGeminiKey() {
+      const key = document.getElementById("geminiApiKeyInput").value.trim();
+      localStorage.setItem("shami_gemini_api_key", key);
+    }
+
+    function handlePdfFileSelected(event) {
+      if (event.target.files && event.target.files.length > 0) {
+        selectedPdfFile = event.target.files[0];
+        showSelectedPdfInfo(selectedPdfFile);
+      }
+    }
+
+    function showSelectedPdfInfo(file) {
+      const info = document.getElementById("selectedPdfInfo");
+      if (info) {
+        info.style.display = "block";
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+        info.innerHTML = `✓ Selected: <strong>${file.name}</strong> (${sizeMb} MB)`;
+      }
+    }
+
+    async function extractTextFromPdfFile(file, progressCb) {
+      if (!window.pdfjsLib) {
+        throw new Error("PDF.js library is not loaded yet. Check internet connection.");
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const totalPages = pdf.numPages;
+      let fullText = "";
+
+      for (let i = 1; i <= totalPages; i++) {
+        if (progressCb) progressCb(i, totalPages);
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(" ");
+        fullText += `\n\n--- Page ${i} ---\n` + pageText;
+      }
+      return fullText.trim();
+    }
+
+    async function runAutomatedExtraction() {
+      const subjectId = document.getElementById("extractorSubjectSelect").value;
+      const subject = bankData.subjects.find(s => s.id === subjectId);
+      if (!subject) return showStatus("Please select a target subject.");
+
+      const engine = document.getElementById("extractorEngineSelect").value;
+      const apiKey = (document.getElementById("geminiApiKeyInput").value || "").trim();
+      const model = document.getElementById("geminiModelSelect").value || "gemini-2.5-flash";
+      const pastedText = (document.getElementById("pastedNotesInput").value || "").trim();
+
+      if (engine === "GEMINI" && !apiKey) {
+        return showStatus("Please enter your Google Gemini API key first.");
+      }
+      if (!selectedPdfFile && !pastedText) {
+        return showStatus("Please choose a PDF file or paste notes text first.");
+      }
+
+      const pContainer = document.getElementById("extractorProgressContainer");
+      const pBar = document.getElementById("extractorProgressBar");
+      const pLabel = document.getElementById("extractorStatusLabel");
+      const startBtn = document.getElementById("startExtractionBtn");
+
+      pContainer.style.display = "block";
+      pLabel.style.display = "block";
+      pBar.style.width = "10%";
+      startBtn.disabled = true;
+
+      try {
+        let extractedDocText = pastedText;
+
+        if (selectedPdfFile) {
+          pLabel.textContent = "Reading PDF pages and extracting text streams...";
+          extractedDocText = await extractTextFromPdfFile(selectedPdfFile, (cur, tot) => {
+            const pct = Math.round((cur / tot) * 45);
+            pBar.style.width = pct + "%";
+            pLabel.textContent = `Reading PDF: Page ${cur} of ${totalPages = tot}...`;
+          });
+          if (pastedText) {
+            extractedDocText += "\n\n" + pastedText;
+          }
+        }
+
+        if (!extractedDocText || extractedDocText.length < 20) {
+          throw new Error("No readable text found in the PDF. Please paste notes text or verify PDF is not blank.");
+        }
+
+        pBar.style.width = "55%";
+        pLabel.textContent = (engine === "GEMINI")
+          ? "Deeply analyzing questions with Google Gemini AI..."
+          : "Analyzing questions with Smart Offline Rule Engine...";
+
+        let drafts = [];
+        if (engine === "GEMINI") {
+          drafts = await callGeminiApiForQuestions(apiKey, model, extractedDocText, (pct, msg) => {
+            pBar.style.width = (55 + Math.round(pct * 0.4)) + "%";
+            pLabel.textContent = msg;
+          });
+        } else {
+          drafts = parseQuestionsOffline(extractedDocText);
+        }
+
+        pBar.style.width = "100%";
+        pLabel.textContent = `Completed! Successfully extracted ${drafts.length} questions.`;
+
+        currentExtractedQuestions = drafts;
+        renderExtractedPreview(drafts);
+        showStatus(`Extracted ${drafts.length} questions! Review below and click 'Insert into Database'.`);
+      } catch (err) {
+        showStatus("Extraction Error: " + err.message);
+        pLabel.textContent = "Failed: " + err.message;
+      } finally {
+        startBtn.disabled = false;
+      }
+    }
+
+    async function callGeminiApiForQuestions(apiKey, model, docText, progressCb) {
+      const systemPrompt = `You are an expert bilingual Pakistani board examination paper parser and curriculum specialist.
+Your task is to analyze the provided textbook or notes text and extract ALL exam questions with extreme thoroughness into a structured JSON object.
+
+Strict Requirements:
+1. Extract ALL Multiple Choice Questions (MCQs), Short Questions (مختصر سوالات), and Long/Detailed Questions (تفصیلی سوالات). Do NOT skip any question.
+2. For each question, ALWAYS provide BOTH English ('questionEn') and Urdu ('questionUr'). If the source is in Urdu only, provide an accurate English translation in 'questionEn'. If the source is in English only, provide an accurate Urdu translation in 'questionUr'.
+3. For MCQs, extract all 4 options in English (optionAEn, optionBEn, optionCEn, optionDEn) and in Urdu (optionAUr, optionBUr, optionCUr, optionDUr), and the correctOption ('A', 'B', 'C', or 'D').
+4. Auto-detect the chapter number ('chapterNumber', integer, e.g. 1, 2, 3...) and chapter titles ('chapterTitleEn', 'chapterTitleUr'). If unknown, default to 1.
+5. Set 'type' to "MCQ", "SHORT", or "LONG".
+
+Return ONLY valid JSON matching this schema:
+{
+  "questions": [
+    {
+      "chapterNumber": 1,
+      "chapterTitleEn": "Nutrition and Digestion",
+      "chapterTitleUr": "نیوٹریشن اور ڈائجیشن",
+      "type": "SHORT",
+      "questionEn": "Define autotrophic nutrition.",
+      "questionUr": "آٹوٹروفک نیوٹریشن کی تعریف کریں۔",
+      "optionAEn": "",
+      "optionBEn": "",
+      "optionCEn": "",
+      "optionDEn": "",
+      "optionAUr": "",
+      "optionBUr": "",
+      "optionCUr": "",
+      "optionDUr": "",
+      "correctOption": "A",
+      "marks": 2
+    }
+  ]
+}`;
+
+      const chunks = [];
+      const maxChunkSize = 35000;
+      for (let i = 0; i < docText.length; i += maxChunkSize) {
+        chunks.push(docText.slice(i, i + maxChunkSize));
+      }
+
+      const allExtracted = [];
+      for (let c = 0; c < chunks.length; c++) {
+        if (progressCb) {
+          progressCb((c / chunks.length) * 100, `Gemini AI analyzing section ${c + 1} of ${chunks.length}...`);
+        }
+        const chunkText = chunks[c];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const body = {
+          contents: [
+            {
+              parts: [{ text: `${systemPrompt}\n\n--- DOCUMENT CONTENT ---\n${chunkText}` }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        };
+
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`Gemini API Error (HTTP ${resp.status}): ${errText}`);
+        }
+
+        const data = await resp.json();
+        const candidate = data.candidates && data.candidates[0];
+        const text = candidate && candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text;
+        if (!text) continue;
+
+        let cleanJson = text.trim();
+        if (cleanJson.includes("```json")) {
+          cleanJson = cleanJson.substring(cleanJson.indexOf("```json") + 7).split("```")[0].trim();
+        } else if (cleanJson.includes("```")) {
+          cleanJson = cleanJson.substring(cleanJson.indexOf("```") + 3).split("```")[0].trim();
+        }
+
+        try {
+          const parsed = JSON.parse(cleanJson);
+          const list = Array.isArray(parsed) ? parsed : (parsed.questions || []);
+          allExtracted.push(...list);
+        } catch (e) {
+          console.warn("Could not parse chunk JSON:", e);
+        }
+      }
+      return allExtracted;
+    }
+
+    function parseQuestionsOffline(rawText) {
+      const results = [];
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      let curChapter = 1;
+      let curChTitleEn = "";
+      let curChTitleUr = "";
+      let curMode = "SHORT";
+
+      const chRegex = /(?:(?:Chapter|Ch|Unit|باب)\s*(?:No\.?)?\s*([0-9]+)|باب\s*نمبر\s*([0-9]+))[:\-\s]*(.*)/i;
+      const mcqRegex = /(?:Multiple\s*Choice|MCQs?|کثیر\s*الانتخابی|معروضی)/i;
+      const shortRegex = /(?:Short\s*Questions?|مختصر\s*سوالات|شارٹ\s*کوسچن)/i;
+      const longRegex = /(?:Long\s*Questions?|Detailed|تفصیلی\s*سوالات|انشائیہ|لانگ\s*کوسچن)/i;
+
+      for (const line of lines) {
+        const chM = line.match(chRegex);
+        if (chM) {
+          curChapter = parseInt(chM[1] || chM[2]) || curChapter;
+          const [en, ur] = splitMixedLanguageSegment(chM[3] || "");
+          curChTitleEn = en || `Chapter ${curChapter}`;
+          curChTitleUr = ur || `باب ${curChapter}`;
+          continue;
+        }
+
+        if (mcqRegex.test(line)) { curMode = "MCQ"; continue; }
+        if (shortRegex.test(line)) { curMode = "SHORT"; continue; }
+        if (longRegex.test(line)) { curMode = "LONG"; continue; }
+
+        const cleanLine = line.replace(/^(?:Q(?:uestion)?\.?\s*\d+|\(\d+\)|\d+[\.\)\-\:]|[•\-\*])\s*/i, "").trim();
+        if (!cleanLine || cleanLine.length < 5) continue;
+
+        if (curMode === "MCQ" && cleanLine.includes("|")) {
+          const parts = cleanLine.split("|").map(p => p.trim());
+          const [qEn, qUr] = splitMixedLanguageSegment(parts[0] || "");
+          const [aEn, aUr] = splitMixedLanguageSegment(parts[1] || "A");
+          const [bEn, bUr] = splitMixedLanguageSegment(parts[2] || "B");
+          const [cEn, cUr] = splitMixedLanguageSegment(parts[3] || "C");
+          const [dEn, dUr] = splitMixedLanguageSegment(parts[4] || "D");
+          const ans = (parts[5] || "A").toUpperCase().trim().slice(0, 1);
+
+          results.push({
+            chapterNumber: curChapter,
+            chapterTitleEn: curChTitleEn,
+            chapterTitleUr: curChTitleUr,
+            type: "MCQ",
+            questionEn: qEn,
+            questionUr: qUr,
+            optionAEn: aEn,
+            optionBEn: bEn,
+            optionCEn: cEn,
+            optionDEn: dEn,
+            optionAUr: aUr,
+            optionBUr: bUr,
+            optionCUr: cUr,
+            optionDUr: dUr,
+            correctOption: ["A", "B", "C", "D"].includes(ans) ? ans : "A",
+            marks: 1
+          });
+        } else {
+          const [qEn, qUr] = splitMixedLanguageSegment(cleanLine);
+          results.push({
+            chapterNumber: curChapter,
+            chapterTitleEn: curChTitleEn,
+            chapterTitleUr: curChTitleUr,
+            type: curMode,
+            questionEn: qEn,
+            questionUr: qUr,
+            optionAEn: "", optionBEn: "", optionCEn: "", optionDEn: "",
+            optionAUr: "", optionBUr: "", optionCUr: "", optionDUr: "",
+            correctOption: "A",
+            marks: curMode === "LONG" ? 4 : 2
+          });
+        }
+      }
+      return results;
+    }
+
+    function renderExtractedPreview(drafts) {
+      const container = document.getElementById("extractedResultsContainer");
+      const listEl = document.getElementById("extractedPreviewList");
+      const applyBtn = document.getElementById("applyExtractedBtn");
+      const uploadBtn = document.getElementById("uploadAfterExtractBtn");
+
+      if (!container || !listEl) return;
+      container.style.display = "block";
+      applyBtn.style.display = "inline-block";
+      uploadBtn.style.display = "inline-block";
+
+      const mcqCount = drafts.filter(d => d.type === "MCQ").length;
+      const shortCount = drafts.filter(d => d.type === "SHORT").length;
+      const longCount = drafts.filter(d => d.type === "LONG").length;
+      const chSet = new Set(drafts.map(d => d.chapterNumber || 1));
+
+      document.getElementById("statMcqCount").textContent = mcqCount;
+      document.getElementById("statShortCount").textContent = shortCount;
+      document.getElementById("statLongCount").textContent = longCount;
+      document.getElementById("statChapterCount").textContent = chSet.size;
+
+      let html = "";
+      const grouped = {};
+      drafts.forEach((d) => {
+        const ch = d.chapterNumber || 1;
+        if (!grouped[ch]) grouped[ch] = [];
+        grouped[ch].push(d);
+      });
+
+      for (const [chNum, items] of Object.entries(grouped)) {
+        const first = items[0] || {};
+        const titleEn = first.chapterTitleEn || `Chapter ${chNum}`;
+        const titleUr = first.chapterTitleUr || `باب ${chNum}`;
+
+        html += `
+          <div style="margin-bottom:14px; border:1px solid #E2E8F0; border-radius:8px; padding:10px; background:#F8FAFC;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <strong style="color:var(--navy); font-size:13px;">Ch ${chNum}: ${titleEn}</strong>
+              <span style="color:var(--emerald); font-weight:700; font-size:12px;">${titleUr} (${items.length} سوالات)</span>
+            </div>
+        `;
+
+        items.slice(0, 10).forEach((q, idx) => {
+          const badgeClass = q.type === "MCQ" ? "badge-mcq" : (q.type === "LONG" ? "badge-long" : "badge-short");
+          html += `
+            <div style="border-top:1px solid #E2E8F0; padding:6px 0; font-size:12px;">
+              <div style="display:flex; justify-content:space-between;">
+                <span class="badge ${badgeClass}">${idx + 1}. [${q.type}]</span>
+                ${q.type === "MCQ" ? `<strong style="color:#166534;">Correct: Option ${q.correctOption || 'A'}</strong>` : ''}
+              </div>
+              ${q.questionEn ? `<div style="margin-top:3px; color:#0F172A;">${q.questionEn}</div>` : ''}
+              ${q.questionUr ? `<div style="margin-top:2px; color:#1E293B; text-align:right;" dir="rtl">${q.questionUr}</div>` : ''}
+              ${q.type === "MCQ" ? `
+                <div style="font-size:11px; color:#475569; margin-top:4px; display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+                  <div>(A) ${q.optionAEn || ''} ${q.optionAUr ? `| ${q.optionAUr}` : ''}</div>
+                  <div>(B) ${q.optionBEn || ''} ${q.optionBUr ? `| ${q.optionBUr}` : ''}</div>
+                  <div>(C) ${q.optionCEn || ''} ${q.optionCUr ? `| ${q.optionCUr}` : ''}</div>
+                  <div>(D) ${q.optionDEn || ''} ${q.optionDUr ? `| ${q.optionDUr}` : ''}</div>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        });
+
+        if (items.length > 10) {
+          html += `<div style="font-size:11px; color:#64748B; font-style:italic; margin-top:4px;">+ ${items.length - 10} more questions in this chapter...</div>`;
+        }
+        html += `</div>`;
+      }
+
+      listEl.innerHTML = html;
+    }
+
+    function applyExtractedQuestionsToBank() {
+      if (!currentExtractedQuestions || currentExtractedQuestions.length === 0) {
+        return showStatus("No extracted questions to apply.");
+      }
+      const subjectId = document.getElementById("extractorSubjectSelect").value;
+      const cls = document.getElementById("extractorClassSelect").value;
+      const subject = bankData.subjects.find(s => s.id === subjectId);
+      if (!subject) return showStatus("Subject not found.");
+
+      let newChaptersCount = 0;
+      let newQuestionsCount = 0;
+
+      currentExtractedQuestions.forEach((draft) => {
+        const chNum = parseInt(draft.chapterNumber) || 1;
+        let chapter = bankData.chapters.find(c => c.subjectId === subject.id && c.chapterNumber === chNum);
+        if (!chapter) {
+          const chId = `${subject.id}_ch_${chNum}`;
+          chapter = {
+            id: chId,
+            subjectId: subject.id,
+            classLevel: cls,
+            chapterNumber: chNum,
+            titleEn: draft.chapterTitleEn || `Ch ${chNum}: Topic`,
+            titleUr: draft.chapterTitleUr || `باب ${chNum}`,
+            isFreeByDefault: (chNum === 1)
+          };
+          bankData.chapters.push(chapter);
+          newChaptersCount++;
+        }
+
+        const qId = `${chapter.id}_q_${Math.random().toString(36).slice(2, 10)}`;
+        const qEntity = {
+          id: qId,
+          chapterId: chapter.id,
+          subjectId: subject.id,
+          classLevel: cls,
+          type: draft.type || "SHORT",
+          questionEn: draft.questionEn || "",
+          questionUr: draft.questionUr || "",
+          optionAEn: draft.optionAEn || "",
+          optionBEn: draft.optionBEn || "",
+          optionCEn: draft.optionCEn || "",
+          optionDEn: draft.optionDEn || "",
+          optionAUr: draft.optionAUr || "",
+          optionBUr: draft.optionBUr || "",
+          optionCUr: draft.optionCUr || "",
+          optionDUr: draft.optionDUr || "",
+          correctOption: draft.correctOption || "A",
+          marks: draft.marks || (draft.type === "MCQ" ? 1 : (draft.type === "LONG" ? 4 : 2)),
+          sortOrder: 0
+        };
+        bankData.questions.push(qEntity);
+        newQuestionsCount++;
+      });
+
+      bankData.updatedAt = Date.now();
+      onSubjectChanged();
+      showStatus(`🎉 Successfully inserted ${newQuestionsCount} questions into ${subject.nameEn} across ${newChaptersCount} new/updated chapters! Click 'Upload All Changes to GitHub' to sync.`);
+    }
+
     initDefaultChapters();
+    initAiExtractor();
   </script>
 </body>
 </html>

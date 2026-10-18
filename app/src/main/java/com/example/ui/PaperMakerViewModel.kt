@@ -31,8 +31,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 import android.util.Log
 import android.app.Activity
+import com.example.ai.ExtractedQuestionDraft
 
 enum class BottomNavTab {
     HOME,
@@ -853,6 +855,89 @@ class PaperMakerViewModel(application: Application) : AndroidViewModel(applicati
             AdManager.applyRemoteConfigIfPresent(getApplication(), payload.adConfig)
         } catch (t: Throwable) {
             Log.w("PaperMakerVM", "applyBankPayloadToDatabase warning: ${t.message}")
+        }
+    }
+
+    fun insertExtractedBatchQuestions(
+        subject: SubjectEntity,
+        questions: List<ExtractedQuestionDraft>,
+        onComplete: (count: Int) -> Unit
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (questions.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _statusMessage.value = "No questions to insert."
+                        onComplete(0)
+                    }
+                    return@launch
+                }
+
+                val existingChapters = dao.getAllChaptersOnce().filter { it.subjectId == subject.id }.toMutableList()
+                val newChaptersToInsert = mutableListOf<ChapterEntity>()
+                val newQuestionsToInsert = mutableListOf<QuestionEntity>()
+
+                for (draft in questions) {
+                    val chNum = draft.chapterNumber
+                    var ch = existingChapters.find { it.chapterNumber == chNum }
+                    if (ch == null) {
+                        val chId = "${subject.id}_ch_$chNum"
+                        val titleEn = draft.chapterTitleEn.ifBlank { "Ch $chNum: Topic" }
+                        val titleUr = draft.chapterTitleUr.ifBlank { "باب $chNum" }
+                        ch = ChapterEntity(
+                            id = chId,
+                            subjectId = subject.id,
+                            classLevel = subject.classLevel,
+                            chapterNumber = chNum,
+                            titleEn = titleEn,
+                            titleUr = titleUr,
+                            isFreeByDefault = (chNum == 1)
+                        )
+                        existingChapters.add(ch)
+                        newChaptersToInsert.add(ch)
+                    }
+
+                    val qId = "${ch.id}_q_${UUID.randomUUID().toString().take(8)}"
+                    val qEntity = QuestionEntity(
+                        id = qId,
+                        chapterId = ch.id,
+                        subjectId = subject.id,
+                        classLevel = subject.classLevel,
+                        type = draft.type,
+                        questionEn = draft.questionEn,
+                        questionUr = draft.questionUr,
+                        optionAEn = draft.optionAEn,
+                        optionBEn = draft.optionBEn,
+                        optionCEn = draft.optionCEn,
+                        optionDEn = draft.optionDEn,
+                        optionAUr = draft.optionAUr,
+                        optionBUr = draft.optionBUr,
+                        optionCUr = draft.optionCUr,
+                        optionDUr = draft.optionDUr,
+                        correctOption = draft.correctOption,
+                        marks = draft.marks,
+                        sortOrder = 0
+                    )
+                    newQuestionsToInsert.add(qEntity)
+                }
+
+                if (newChaptersToInsert.isNotEmpty()) {
+                    dao.insertChapters(newChaptersToInsert)
+                }
+                if (newQuestionsToInsert.isNotEmpty()) {
+                    dao.insertQuestions(newQuestionsToInsert)
+                }
+
+                withContext(Dispatchers.Main) {
+                    _statusMessage.value = "Successfully saved ${newQuestionsToInsert.size} extracted questions into ${subject.nameEn}!"
+                    onComplete(newQuestionsToInsert.size)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _statusMessage.value = "Failed to insert questions: ${e.message}"
+                    onComplete(0)
+                }
+            }
         }
     }
 }

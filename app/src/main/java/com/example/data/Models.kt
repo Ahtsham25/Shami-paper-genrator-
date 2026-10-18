@@ -263,3 +263,22 @@ data class GitHubPaperBankPayload(
     val chapters: List<ChapterEntity> = emptyList(),
     val questions: List<QuestionEntity> = emptyList()
 )
+
+data class ExtractedQuestionDraft(
+    val chapterNumber: Int = 1,
+    val chapterTitleEn: String = "",
+    val chapterTitleUr: String = "",
+    val type: String = "SHORT", // "MCQ", "SHORT", "LONG"
+    val questionEn: String = "",
+    val questionUr: String = "",
+    val optionAEn: String = "",
+    val optionBEn: String = "",
+    val optionCEn: String = "",
+    val optionDEn: String = "",
+    val optionAUr: String = "",
+    val optionBUr: String = "",
+    val optionCUr: String = "",
+    val optionDUr: String = "",
+    val correctOption: String = "A",
+    val marks: Int = if (type == "MCQ") 1 else if (type == "SHORT") 2 else 4
+)
